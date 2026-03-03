@@ -18,7 +18,7 @@
 
 Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, globals stores which allow you to build reactive user interfaces whilst still using default Roblox's UI components.
 
-To learn more or get more details on the installation and available methods, [read the docs](https://github.com/chteau/Fragment/wiki) here.
+To learn more or get more details on the installation and available methods, [read the docs](https://chteau.github.io/Fragment/) here.
 
 ## Installation
 
@@ -53,11 +53,11 @@ local Fragment = require(ReplicatedStorage.Fragment)
 Fragment.load(script.Parent.Handles)
 ```
 
-That's it! You can see a bit of the API references and some examples in this readme or you can head to the [Github Wiki](https://github.com/chteau/Fragment/wiki) to find out how it works in details.
+That's it! You can see a bit of the API references and some examples in this readme or you can head to the [Github Wiki](https://chteau.github.io/Fragment/) to find out how it works in details.
 
 ## Core Concepts
 
-Fragment runs as a singleton across your whole client and can be required everywhere in your Handles, Stores, Hooks and Contexts. 
+Fragment runs as a singleton across your whole client and can be required everywhere in your Handles, Stores, Hooks and Contexts.
 
 ### 1. Handles
 Handles bind logic to specific UI instances. They are created using `Fragment.newHandle` and define a **Rendered Function** that runs whenever the state of your handle changes.
@@ -127,4 +127,4 @@ You can pretty much use Fragment for anything. In my case, I use it with [Replic
 
 ## Conclusion
 
-Again, if you wanna know how things work in more details, check out the [Github Wiki](https://github.com/chteau/Fragment/wiki) for API references and usage examples. Peace!
+Again, if you wanna know how things work in more details, check out the [Github Wiki](https://chteau.github.io/Fragment/) for API references and usage examples. Peace!
