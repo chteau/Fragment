@@ -29,8 +29,8 @@ export const metadata = {
 
     // Favicon
     icons: {
-        icon: "/logo.png",
-        shortcut: "/logo.png",
+        icon: "Fragment/logo.png",
+        shortcut: "Fragment/logo.png",
     },
 
     // Additional Metadata
@@ -49,13 +49,13 @@ export const metadata = {
     // Open Graph / Social Media Metadata
     openGraph: {
         type: "website",
-        url: "https://fragment.vercel.app",
+        url: "https://chteau.github.io/Fragment/",
         title: "Fragment",
         description: "Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, globals stores which allow you to build reactive user interfaces whilst still using default Roblox's UI components. Built specifically for Roblox's server-side environment with Rojo workflow compatibility.",
         siteName: "Fragment",
         images: [
             {
-                url: "/banner.png",
+                url: "Fragment/banner.png",
                 width: 1200,
                 height: 630,
                 alt: "Fragment - A simple module to manage Roblox's UI components inspired by React.",
@@ -69,7 +69,7 @@ export const metadata = {
         card: "summary_large_image",
         title: "Fragment",
         description: "Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, globals stores which allow you to build reactive user interfaces whilst still using default Roblox's UI components.",
-        images: ["/banner.png"],
+        images: ["Fragment/banner.png"],
         creator: "@Cheeteau_",
         site: "@Cheeteau_",
     },
