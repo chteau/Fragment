@@ -55,7 +55,7 @@ export const metadata = {
         siteName: "Fragment",
         images: [
             {
-                url: "Fragment/banner.png",
+                url: "/banner.png",
                 width: 1200,
                 height: 630,
                 alt: "Fragment - A simple module to manage Roblox's UI components inspired by React.",
@@ -69,7 +69,7 @@ export const metadata = {
         card: "summary_large_image",
         title: "Fragment",
         description: "Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, globals stores which allow you to build reactive user interfaces whilst still using default Roblox's UI components.",
-        images: ["Fragment/banner.png"],
+        images: ["/banner.png"],
         creator: "@Cheeteau_",
         site: "@Cheeteau_",
     },
