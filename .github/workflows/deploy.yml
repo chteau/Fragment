@@ -22,28 +22,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        name: Install pnpm
-        with:
-          version: 10
-          run_install: false
+      - name: Setup Pages
+        id: setup_pages
+        uses: actions/configure-pages@v5
 
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'pnpm'
+          cache: 'npm'
           cache-dependency-path: docs/package-lock.json
 
       - name: Install dependencies
         working-directory: docs
-        run: pnpm install
+        run: npm install
 
-      - name: Setup Pages
-        id: setup_pages
-        uses: actions/configure-pages@v5
-
-      - name: Restore cache
+      - name: Restore Next.js cache
         uses: actions/cache@v4
         with:
           path: docs/.next/cache
@@ -51,15 +45,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('docs/package-lock.json') }}-
 
-      - name: Build with Next.js
+      - name: Build
         working-directory: docs
-        run: pnpm run build
+        run: npm run build
         env:
           PAGES_BASE_PATH: ${{ steps.setup_pages.outputs.base_path }}
-          
-      - name: Disable Jekyll    # [!code ++]
-        run: touch docs/out/.nojekyll    # [!code ++]
-        
+
+      - name: Disable Jekyll
+        run: touch docs/out/.nojekyll
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
