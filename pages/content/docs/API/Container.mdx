@@ -1,0 +1,173 @@
+---
+title: Container
+description: Diffing child manager for dynamic UI lists.
+icon: Component
+---
+
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+A Container is returned by `Handle.RegisterContainer(frame)`. It tracks child Instances by key and diffs them across renders — only inserting new children, reusing existing ones, and destroying any that were not touched during the current cycle.
+
+<Callout title="Persistent" type="info">
+    A Container for a given frame is created once and reused on every re-render. The `_children` table survives across renders; only `_touchedKeys` is reset each cycle.
+</Callout>
+
+---
+
+# Methods
+
+## `UpsertChild(child)` / `UpsertChild(key, child)`
+
+Inserts a new child or returns the existing live Instance for that key. On re-renders the incoming clone is destroyed and the already-parented Instance is returned. **Always write property updates to the returned value.**
+
+<TypeTable
+  type={{
+    UpsertChild: {
+      description: "Inserts or returns the live Instance for a key. Destroys the incoming clone if the key already exists.",
+      type: "(keyOrChild: string | Instance, child: Instance?) -> Instance"
+    }
+  }}
+/>
+
+When called with one argument the key defaults to `child.Name`. When called with two arguments the first is the explicit key.
+
+**Example**:
+```luau title="LeaderboardHandle.luau"
+local list = Handle.RegisterContainer(element.ScrollFrame)
+
+for i, entry in ipairs(data.entries) do
+    local live = list.UpsertChild(entry.id, Assets.Row:Clone()) -- [!code highlight]
+    live.Label.Text  = entry.name
+    live.Score.Text  = tostring(entry.score)
+    live.LayoutOrder = i
+end
+```
+
+---
+
+## `InsertChild(key, child)`
+
+Inserts a child only if the key does not already exist. Warns and returns the existing Instance if the key is taken. Use `UpsertChild` when you want upsert semantics.
+
+<TypeTable
+  type={{
+    InsertChild: {
+      description: "Inserts a new child under key. Warns and returns the existing Instance if the key is already taken.",
+      type: "(key: string, child: Instance) -> Instance"
+    }
+  }}
+/>
+
+**Example**:
+```luau
+local header = list.InsertChild("Header", Assets.SectionHeader:Clone())
+header.Text = "Top Players"
+```
+
+---
+
+## `GetChild(key)`
+
+Returns the tracked Instance for a key, or `nil` if not found.
+
+<TypeTable
+  type={{
+    GetChild: {
+      description: "Returns the tracked Instance for a key.",
+      type: "(key: string) -> Instance?"
+    }
+  }}
+/>
+
+**Example**:
+```luau
+local row = list.GetChild("player_123")
+if row then
+    row.Highlight.Visible = true
+end
+```
+
+---
+
+## `GetAllChildren()`
+
+Returns the full `{ [key]: Instance }` map of all tracked children.
+
+<TypeTable
+  type={{
+    GetAllChildren: {
+      description: "Returns all tracked children as a key-to-Instance map.",
+      type: "() -> { [string]: Instance }"
+    }
+  }}
+/>
+
+**Example**:
+```luau
+for key, child in pairs(list.GetAllChildren()) do
+    child.Highlight.Visible = false
+end
+```
+
+---
+
+## `UpdateChild(key, fn)`
+
+Passes the live Instance for `key` to `fn`. Warns if the key is not found. Use this for one-off mutations outside the main loop.
+
+<TypeTable
+  type={{
+    UpdateChild: {
+      description: "Calls fn with the live Instance for key. Warns if the key is not found.",
+      type: "(key: string, fn: (Instance) -> ()) -> ()"
+    }
+  }}
+/>
+
+**Example**:
+```luau
+list.UpdateChild("player_123", function(row)
+    row.NameLabel.TextColor3 = Color3.new(1, 0.8, 0)
+end)
+```
+
+---
+
+## `DeleteChild(key)`
+
+Destroys the Instance for `key` and removes it from tracking.
+
+<TypeTable
+  type={{
+    DeleteChild: {
+      description: "Destroys and untracks the Instance for key.",
+      type: "(key: string) -> ()"
+    }
+  }}
+/>
+
+**Example**:
+```luau
+list.DeleteChild("player_123")
+```
+
+---
+
+## `ClearChildren()`
+
+Destroys every tracked child and resets the container to empty.
+
+<TypeTable
+  type={{
+    ClearChildren: {
+      description: "Destroys all tracked children and clears the container.",
+      type: "() -> ()"
+    }
+  }}
+/>
+
+**Example**:
+```luau
+list.ClearChildren() -- Wipe the list before a full rebuild
+```

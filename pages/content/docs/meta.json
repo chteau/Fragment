@@ -1,0 +1,22 @@
+{
+    "title": "Fragment",
+    "root": true,
+    "pages": [
+        "---Getting Started---",
+        "index",
+        "installation",
+        "quick-start",
+        "create-new-handle",
+        "create-new-store",
+        "create-new-context",
+        "create-new-hook",
+        "create-new-reactive-container",
+
+        "---Public API---",
+        "API/Fragment",
+        "API/Handle",
+        "API/Context",
+        "API/Container",
+        "API/Compose"
+    ]
+}

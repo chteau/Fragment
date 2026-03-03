@@ -1,0 +1,163 @@
+---
+title: Create a Hook
+description: Package reusable binding logic into composable functions.
+icon: Puzzle
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Hooks are reusable functions that package combinations of `bind`, `derive`, `hold`, `await` and `pull` into a single callable. They are created with `Fragment.compose` and can be shared across any number of Handles.
+
+<Callout title="Slot order rule" type="warn">
+    Hooks follow the same rule as individual bindings — call them unconditionally, at the top of the renderer, in the same order every render.
+</Callout>
+
+---
+
+## Hook without a Context
+
+The simplest hook is one that wraps local binding logic you find yourself repeating across Handles.
+
+```luau title="Hooks/useToggle.luau"
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Fragment = require(ReplicatedStorage.Fragment)
+
+local useToggle = Fragment.compose(function(handle, initialState: boolean?)
+    local value, setValue = handle:bind(initialState or false)
+
+    local toggle = handle:hold(function()
+        setValue(not value())
+    end, { value() })
+
+    return value, toggle
+end)
+
+return useToggle
+```
+
+```luau title="Handles/SettingsHandle.luau"
+local useToggle = require(path.to.Hooks.useToggle)
+
+return Handle(function(element: Frame)
+    local soundOn, toggleSound = useToggle(true) -- [!code highlight]
+
+    element.SoundToggle.Active = soundOn()
+
+    Handle.Connect("SoundToggle", element.SoundToggle.Activated, function()
+        toggleSound() -- [!code highlight]
+    end)
+end)
+```
+
+---
+
+## Hook backed by a Context
+
+A hook can also pull from a Context and expose the relevant slice of it. This is the recommended pattern when the same Context is accessed by many Handles in similar ways.
+
+```luau title="Hooks/useWindow.luau"
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Fragment = require(ReplicatedStorage.Fragment)
+local WindowContext = require(path.to.Contexts.WindowContext)
+
+local useWindow = Fragment.compose(function(handle, windowName: string)
+    local win = handle:pull(WindowContext)
+
+    local isOpen = handle:derive(function()
+        return win.active == windowName
+    end, { win.active })
+
+    return isOpen, win
+end)
+
+return useWindow
+```
+
+`isOpen` is a getter that returns a fresh boolean each render, memoised against `win.active`. `win` is the full Context value table, so the caller has access to `win.open`, `win.close` and `win.toggle` as well.
+
+---
+
+## Connecting a Context hook to a Handle
+
+```luau title="Handles/InventoryHandle.luau"
+local useWindow = require(path.to.Hooks.useWindow)
+
+local Handle = Fragment.newHandle("Inventory", { "HUD", "Inventory", "MainFrame" })
+
+return Handle(function(element: Frame)
+    local isOpen, win = useWindow("Inventory") -- [!code highlight]
+
+    element.Visible = isOpen() -- [!code highlight]
+    if not isOpen() then return end
+
+    Handle.Action("Toggle", function(state: boolean)
+        if state then win.open("Inventory") else win.close("Inventory") end
+    end)
+
+    local closeBtn = element.TopBar.Close :: TextButton
+    Handle.Connect("Close", closeBtn.Activated, function()
+        win.close("Inventory") -- [!code highlight]
+    end)
+end)
+```
+
+```luau title="Handles/InventoryOpener.luau"
+local useWindow = require(path.to.Hooks.useWindow)
+
+local Handle = Fragment.newHandle("InventoryOpener", { "HUD", "Buttons", "Inventory" })
+
+return Handle(function(element: TextButton)
+    local isOpen, win = useWindow("Inventory") -- [!code highlight]
+
+    element.BackgroundTransparency = isOpen() and 0 or 0.5
+
+    Handle.Connect("Open", element.Activated, function()
+        win.toggle("Inventory") -- [!code highlight]
+    end)
+end)
+```
+
+---
+
+## Hook with async data
+
+Hooks can wrap `await` to give you a clean loading-state pattern reusable across any Handle.
+
+```luau title="Hooks/usePlayerData.luau"
+local Fragment = require(path.to.Fragment)
+local PlayerService = require(path.to.PlayerService)
+
+local usePlayerData = Fragment.compose(function(handle)
+    local result = handle:await(function() -- [!code highlight]
+        return PlayerService:FetchAsync() -- [!code highlight]
+    end, {}) -- [!code highlight]
+
+    return result
+end)
+
+return usePlayerData
+```
+
+```luau title="Handles/ProfileHandle.luau"
+local usePlayerData = require(path.to.Hooks.usePlayerData)
+
+return Handle(function(element: Frame)
+    local result = usePlayerData() -- [!code highlight]
+
+    if result.status == "pending" then
+        element.Spinner.Visible = true
+        return
+    end
+
+    element.Spinner.Visible = false
+
+    if result.status == "resolved" then
+        element.Username.Text = result.value.name -- [!code highlight]
+        element.Level.Text = `Lv. {result.value.level}` -- [!code highlight]
+    end
+end)
+```
+
+---
+
+For the full Compose API see the [Compose reference](/docs/API/Compose).
