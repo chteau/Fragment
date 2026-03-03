@@ -493,18 +493,6 @@ function HandleMethods.Render(self: any): ()
 end
 
 --[[
-    Sets data subscriptions for the handle.
-
-    @param any self - The handle instance
-    @param ...: string - Data keys to watch
-    @returns any - The handle instance
-]]
-function HandleMethods.watch(self: any, ...: string): any
-    self._subscriptions = { ... }
-    return self
-end
-
---[[
     Disconnects a named connection.
 
     @param any self - The handle instance
