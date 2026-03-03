@@ -26,12 +26,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
+          cache: 'pnpm'
           cache-dependency-path: docs/package-lock.json
 
       - name: Install dependencies
         working-directory: docs
-        run: npm install
+        run: pnpm install
 
       - name: Setup Pages
         id: setup_pages
@@ -47,7 +47,7 @@ jobs:
 
       - name: Build with Next.js
         working-directory: docs
-        run: npm run build
+        run: pnpm run build
         env:
           PAGES_BASE_PATH: ${{ steps.setup_pages.outputs.base_path }}
 
