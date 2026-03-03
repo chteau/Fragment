@@ -1,0 +1,132 @@
+---
+title: Create a Context
+description: Shared reactive value objects consumed by any Handle.
+icon: Share2
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+A Context is a lightweight shared value object. Any Handle that calls `handle:pull(ctx)` subscribes to it and re-renders whenever `ctx:patch()` is called.
+
+Contexts are ideal for cross-Handle state that doesn't belong to a specific data source — like which window is currently open, or which theme is active.
+
+---
+
+## Define a Context
+
+Each Context lives in its own `ModuleScript` inside your `Contexts/` folder.
+
+```luau title="Contexts/WindowContext.luau"
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Fragment = require(ReplicatedStorage.Fragment)
+
+local WindowContext = Fragment.createContext({ -- [!code highlight]
+    active = nil :: string?, -- [!code highlight]
+}) -- [!code highlight]
+
+-- Optional additional methods for the context.
+WindowContext._value.open = function(name: string)
+    WindowContext:patch({ active = name })
+end
+
+WindowContext._value.close = function(name: string)
+    if WindowContext._value.active == name then
+        WindowContext:patch({ active = Fragment.DELETE })
+    end
+end
+
+WindowContext._value.toggle = function(name: string)
+    if WindowContext._value.active == name then
+        WindowContext:patch({ active = Fragment.DELETE })
+    else
+        WindowContext:patch({ active = name })
+    end
+end
+
+return WindowContext
+```
+
+`Fragment.DELETE` removes the key from the value table entirely when passed to `patch`. Methods added to `_value` are available to any Handle that pulls from the Context.
+
+<Callout title="Require before loading Handles" type="warn">
+    Contexts must be required before `Fragment.load` is called, as Handles may pull from them during their first render.
+</Callout>
+
+```luau title="FragmentLoad.client.luau"
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Fragment = require(ReplicatedStorage.Fragment)
+
+require(script.Parent.Contexts.WindowContext) -- [!code highlight]
+
+Fragment.load(script.Parent.Handles)
+```
+
+---
+
+## Connect a Context to a Handle
+
+Use `handle:pull(ctx)` inside a renderer to subscribe the Handle and get the live value table back. The Handle re-renders whenever `ctx:patch()` is called.
+
+```luau title="Handles/ShopHandle.luau"
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Fragment = require(ReplicatedStorage.Fragment)
+local WindowContext = require(ReplicatedStorage.Parent.Contexts.WindowContext)
+
+local Handle = Fragment.newHandle("Shop", { "HUD", "Shop", "MainFrame" })
+
+return Handle(function(element: Frame)
+    local win = Handle:pull(WindowContext) -- [!code highlight]
+
+    element.Visible = win.active == "Shop" -- [!code highlight]
+
+    Handle.Action("Toggle", function(state: boolean)
+        if state then
+            win.open("Shop") -- [!code highlight]
+        else
+            win.close("Shop") -- [!code highlight]
+        end
+    end)
+
+    local closeBtn = element.TopBar.Close :: TextButton
+    Handle.Connect("Close", closeBtn.Activated, function()
+        win.close("Shop") -- [!code highlight]
+    end)
+end)
+```
+
+---
+
+## Patching the Context directly
+
+Call `ctx:patch(partial)` on the Context itself to merge values and notify all subscribed Handles. This is how the methods defined in the Context body work under the hood.
+
+```luau
+WindowContext:patch({ active = "Shop" })  -- open shop
+WindowContext:patch({ active = Fragment.DELETE })  -- close all
+```
+
+---
+
+## Multiple Handles sharing the same Context
+
+The real power of Contexts is that any Handle can subscribe independently. Both the window Handle and its opener button can react to the same `active` value without knowing about each other.
+
+```luau title="Handles/ShopOpener.luau"
+local WindowContext = require(path.to.WindowContext)
+
+local Handle = Fragment.newHandle("ShopOpener", { "HUD", "Buttons", "Shop" })
+
+return Handle(function(element: TextButton)
+    local win = Handle:pull(WindowContext) -- [!code highlight]
+
+    element.BackgroundTransparency = win.active == "Shop" and 0 or 0.5 -- [!code highlight]
+
+    Handle.Connect("Open", element.Activated, function()
+        win.toggle("Shop") -- [!code highlight]
+    end)
+end)
+```
+
+---
+
+For the full Context API see the [Context reference](/docs/API/Context).
