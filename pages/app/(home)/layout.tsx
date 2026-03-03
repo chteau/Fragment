@@ -6,7 +6,7 @@ import { baseOptions } from "@/lib/layout.shared";
 import { Braces, LibraryBig } from "lucide-react";
 import { ReactNode } from "react";
 
-export default function Layout({ children }: LayoutProps<"/docs">) {
+export default function Layout({ children }: LayoutProps<"/">) {
     return (
         <SidebarProvider>
             <DocsLayout
