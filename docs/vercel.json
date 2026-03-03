@@ -1,7 +1,7 @@
 {
     "rewrites": [
-        { "source": "/docs", "destination": "https://fragment-luau.vercel.app/" },
-        { "source": "/docs/:path*", "destination": "https://fragment-luau.vercel.app/:path*" }
+        { "source": "/docs", "destination": "https://fragment-luau.vercel.app/" }
     ]
 
 }
+
