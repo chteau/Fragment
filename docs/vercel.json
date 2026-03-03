@@ -1,6 +1,6 @@
 {
     "rewrites": [
-        { "source": "/docs", "destination": "https://fragment-luau.vercel.app/" }
+        { "source": "/docs", "destination": "https://chteau.github.io/Fragment/docs" }
     ]
 
 }
