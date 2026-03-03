@@ -6,7 +6,7 @@ import { baseOptions } from "@/lib/layout.shared";
 import { Braces, LibraryBig } from "lucide-react";
 import { ReactNode } from "react";
 
-export default function Layout({ children }: LayoutProps<"/">) {
+export default function Layout({ children }: LayoutProps<"/docs">) {
     return (
         <SidebarProvider>
             <DocsLayout
@@ -14,6 +14,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
                 {...baseOptions()}
                 sidebar={{
                     tabIndex: 0,
+                    tabs: [],
                 }}
             >
                 {children}
