@@ -6,8 +6,8 @@ const withMDX = createMDX();
 const config = {
   reactStrictMode: true,
   output: 'export',
-  basePath: '/docs/',
-  assetPrefix: '/docs/',
+  basePath: '/docs',
+  assetPrefix: '/docs',
   images: {
     unoptimized: true, // required for static export
   },
