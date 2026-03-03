@@ -1,6 +1,7 @@
 {
     "rewrites": [
-        { "source": "/docs", "destination": "https://chteau.github.io/Fragment/docs" }
+        { "source": "/docs", "destination": "https://chteau.github.io/Fragment/docs" },
+        { "source": "/docs/:path*", "destination": "https://chteau.github.io/Fragment/docs/:path*" }
     ]
 
 }
