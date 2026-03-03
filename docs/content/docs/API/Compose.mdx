@@ -1,0 +1,61 @@
+---
+title: Compose
+description: Create reusable composite bindings from Fragment primitives.
+icon: Component
+---
+
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+`Fragment.compose` lets you package any combination of `bind`, `derive`, `hold`, `await`, and `pull` into a reusable binding function — Fragment's equivalent of a custom hook.
+
+The returned function injects `_activeHandle` automatically, so the inner function receives the correct Handle without being called as a method.
+
+<Callout title="Slot order rule" type="warn">
+    Composite bindings follow the same rule as individual bindings — call them unconditionally, at the top of the renderer, in the same order every render.
+</Callout>
+
+---
+
+# Methods
+
+## `Fragment.compose(fn)`
+
+Creates a composable binding. `fn` receives the active Handle as its first argument, followed by any arguments passed at call-site.
+
+<TypeTable
+  type={{
+    compose: {
+      description: "Creates a reusable composite binding. fn receives the active Handle as its first argument.",
+      type: "(fn: (handle: Handle, ...any) -> any) -> (...any) -> any"
+    }
+  }}
+/>
+
+**Example**:
+```luau title="useWindow.luau"
+local useWindow = Fragment.compose(function(handle, windowName: string)
+    local win    = handle:pull(WindowContext)
+    local isOpen = handle:derive(function()
+        return win.active == windowName
+    end, { win.active })
+
+    return isOpen, win
+end)
+
+return useWindow
+```
+
+```luau title="ShopHandle.luau"
+local useWindow = require(path.to.useWindow)
+
+return Handle(function(element: Frame)
+    local isOpen, win = useWindow("Shop") -- [!code highlight]
+
+    element.Visible = isOpen()
+
+    Handle.Connect("Close", closeBtn.Activated, function()
+        win.close("Shop")
+    end)
+end)
+```
