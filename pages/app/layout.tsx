@@ -30,7 +30,7 @@ export const metadata = {
     // Favicon
     icons: {
         icon: "Fragment/logo.png",
-        shortcut: "Fragment/logo.png",
+        shortcut: "/logo.png",
     },
 
     // Additional Metadata
