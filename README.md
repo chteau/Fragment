@@ -18,7 +18,7 @@
 
 Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, globals stores which allow you to build reactive user interfaces whilst still using default Roblox's UI components.
 
-To lean get more details on the installation and available methods, [read the docs](https://github.com/chteau/Fragment/wiki) here.
+To learn more or get more details on the installation and available methods, [read the docs](https://github.com/chteau/Fragment/wiki) here.
 
 ## Installation
 
@@ -123,7 +123,7 @@ end)
 
 ## Possible Usages
 
-You can pretty much use Fragment for anything. In my case, I made and use it with [ReplicaService](https://devforum.roblox.com/t/replicate-your-states-with-replicaservice-networking-system/894736) and [Knit](https://sleitnick.github.io/Knit/). I really like react and since most of the people I work with don't use it's luau version and bake the UI directly using Roblox's Studio interface manager (if I may call it like that), I thought it would be pretty cool to have such a ressource out there; maybe there's other more complete frameworks for that on roblox but I didn't find any so, here it is.
+You can pretty much use Fragment for anything. In my case, I use it with [ReplicaService](https://devforum.roblox.com/t/replicate-your-states-with-replicaservice-networking-system/894736) and [Knit](https://sleitnick.github.io/Knit/). I really like react and since most of the people I work with don't use it's luau version and bake the UI directly using Roblox's Studio interface manager (if I may call it like that), I thought it would be pretty cool to have such a ressource out there; maybe there's other more complete frameworks for that on roblox but I didn't find any so, here it is.
 
 ## Conclusion
 
