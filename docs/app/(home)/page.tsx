@@ -7,6 +7,6 @@ import { redirect, RedirectType } from 'next/navigation'
 
 
 export default function HomePage() {
-    redirect("/docs", RedirectType.replace)
+    //redirect("/docs", RedirectType.replace)
     return (<></>);
 }
