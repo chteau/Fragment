@@ -1,5 +1,5 @@
 import { RootProvider } from 'fumadocs-ui/provider/next';
-import './global.css';
+import './globals.css';
 import { Inter } from 'next/font/google';
 
 const inter = Inter({
@@ -8,20 +8,15 @@ const inter = Inter({
 
 export const metadata = {
     title: {
-        "default": "Roblox Supabase",
-        "template": "%s | Roblox Supabase",
+        "default": "Fragment",
+        "template": "%s | Fragment",
     },
-    description: "A comprehensive, type-safe Supabase client for Roblox Luau, providing full access to PostgREST API, Storage, and Edge Functions. Built specifically for Roblox's server-side environment with Rojo workflow compatibility.",
+    description: "Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, globals stores which allow you to build reactive user interfaces whilst still using default Roblox's UI components. Built specifically for Roblox's server-side environment with Rojo workflow compatibility.",
     keywords: [
         "Roblox",
         "Luau",
-        "Supabase",
-        "PostgreSQL",
-        "Database",
         "Game Development",
         "Roblox Studio",
-        "PostgREST",
-        "Edge Functions"
     ],
     authors: [
         {
@@ -54,16 +49,16 @@ export const metadata = {
     // Open Graph / Social Media Metadata
     openGraph: {
         type: "website",
-        url: "https://roblox-supabase.vercel.app",
-        title: "Roblox Supabase",
-        description: "A comprehensive, type-safe Supabase client for Roblox Luau, providing full access to PostgREST API, Storage, and Edge Functions. Built specifically for Roblox's server-side environment with Rojo workflow compatibility.",
-        siteName: "Roblox Supabase",
+        url: "https://fragment.vercel.app",
+        title: "Fragment",
+        description: "Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, globals stores which allow you to build reactive user interfaces whilst still using default Roblox's UI components. Built specifically for Roblox's server-side environment with Rojo workflow compatibility.",
+        siteName: "Fragment",
         images: [
             {
                 url: "/banner.png",
                 width: 1200,
                 height: 630,
-                alt: "Roblox Supabase - Full Supabase Integration for Roblox Games",
+                alt: "Fragment - A simple module to manage Roblox's UI components inspired by React.",
             },
         ],
         locale: "en_US",
@@ -72,8 +67,8 @@ export const metadata = {
     // Twitter Card Metadata
     twitter: {
         card: "summary_large_image",
-        title: "Roblox Supabase",
-        description: "A comprehensive, type-safe Supabase client for Roblox Luau, providing full access to PostgREST API, Storage, and Edge Functions.",
+        title: "Fragment",
+        description: "Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, globals stores which allow you to build reactive user interfaces whilst still using default Roblox's UI components.",
         images: ["/banner.png"],
         creator: "@Cheeteau_",
         site: "@Cheeteau_",
