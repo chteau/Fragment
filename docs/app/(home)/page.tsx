@@ -1,11 +1,12 @@
-"use client"
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link';
 
 export default function HomePage() {
-    const router = useRouter()
-    useEffect(() => {
-        router.replace('/docs')
-    }, [router])
-    return null
+    return (
+        <div>
+            <h1>Home</h1>
+            <p>
+                <Link href="/docs">Go to docs</Link>
+            </p>
+        </div>
+    );
 }
