@@ -940,49 +940,6 @@ function Fragment.getHandle(name: string): any
 end
 
 --[[
-    Sets initial data and renders all handles.
-
-    @param Data initialData - Initial data for all handles
-]]
-function Fragment.hook(initialData: Data): ()
-    _data = initialData
-    for _, handle in pairs(_registry) do
-        handle:Render()
-    end
-end
-
---[[
-    Notifies handles about data changes.
-
-    @param {string} path - Path to the changed data
-    @param any newValue - New value
-]]
-function Fragment.notify(path: { string }, newValue: any): ()
-    if #path > 0 then
-        local cursor: any = _data
-        for i = 1, #path - 1 do
-            if type(cursor) ~= "table" then cursor = nil break end
-            cursor = cursor[path[i]]
-        end
-        if type(cursor) == "table" then
-            cursor[path[#path]] = newValue
-        end
-    end
-
-    local topKey = path[1]
-    if not topKey then return end
-
-    for _, handle in pairs(_registry) do
-        for _, sub in ipairs(handle._subscriptions) do
-            if sub == topKey then
-                handle:Render()
-                break
-            end
-        end
-    end
-end
-
---[[
     Renders all handles.
 ]]
 function Fragment.dispatchAll(): ()
