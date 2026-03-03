@@ -1,0 +1,41 @@
+---
+title: Introduction
+description: A simple module to manage Roblox's UI components inspired by React.
+icon: BookOpen
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, globals stores which allow you to build reactive user interfaces whilst still using default Roblox's UI components.
+
+Feel free to support my work by following my [Roblox profile](https://www.roblox.com/users/925308243/profile).
+
+If you wanna test it out yourself, you can either [download a copy here](/Fragment_Demo.rbxl) or play the [demo game on roblox](https://www.roblox.com/games/103912637612783/Fragment-Demo).
+
+---
+
+## What Fragment provides
+
+- **Handles** — bind a renderer to a specific UI path
+- **Reactive bindings** — local `bind`, `derive`, `hold`, `await`...
+- **Global stores** — centralized reactive state shared across Handles
+- **Contexts** — shared value objects
+- **Composable hooks** — reusable logic via `Fragment.compose`
+- **Diffing containers** — efficient dynamic child management
+- **Effect lifecycle** — automatic cleanup between renders
+
+---
+
+## API Reference
+
+<Cards>
+  <Card title="Fragment" href="/docs/API/Fragment" />
+  <Card title="Handle" href="/docs/API/Handle" />
+  <Card title="Context" href="/docs/API/Context" />
+  <Card title="Container" href="/docs/API/Container" />
+  <Card title="Compose" href="/docs/API/Compose" />
+</Cards>
+
+---
+
+Made with ❤️ - `@Cheeteau`

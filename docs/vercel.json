@@ -1,0 +1,6 @@
+{
+    "rewrites": [
+        { "source": "/docs", "destination": "https://fragment.vercel.app/" },
+        { "source": "/docs/:path*", "destination": "https://fragment.vercel.app/:path*" }
+    ]
+}
