@@ -29,7 +29,7 @@ export const metadata = {
 
     // Favicon
     icons: {
-        icon: "Fragment/logo.png",
+        icon: "/logo.png",
         shortcut: "/logo.png",
     },
 
