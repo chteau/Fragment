@@ -350,36 +350,3 @@ Manually triggers a full render pass.
 ```luau
 Fragment.getHandle("HUD"):Render()
 ```
-
----
-
-# Module-level state
-
-## `Handle.useState(initialValue)`
-
-Allocates a permanent state slot at **module level**, outside the renderer. Returns a getter and setter that remain stable for the entire lifetime of the handle.
-
-<Callout title="Module level only" type="warn">
-    Call `useState` once at the top of your module, not inside the renderer. Use `handle:bind()` instead when the state only makes sense inside the renderer.
-</Callout>
-
-<TypeTable
-  type={{
-    useState: {
-      description: "Allocates a permanent state slot at module level.",
-      type: "(initialValue: any) -> (() -> any, (any) -> ())"
-    }
-  }}
-/>
-
-**Example**:
-```luau title="ShopHandle.luau"
-local Handle = Fragment.newHandle("Shop", { "PlayerGui", "Shop" })
-
-local tabIndex, setTabIndex = Handle.useState(1) -- [!code highlight]
-
-return Handle(function(element: Frame)
-    local current = tabs[tabIndex()]
-    -- ...
-end)
-```

@@ -889,24 +889,6 @@ function Fragment.newHandle(name: string, path: { string }): any
     handle.Connect = handle._warnConnect
     handle.RegisterContainer = handle._warnRegisterContainer
 
-    --[[
-        Creates a local state for the handle.
-
-        @param any initialValue - Initial state value
-        @returns (() -> any, (any) -> ()) - Getter and setter functions
-    ]]
-    handle.useState = function(initialValue: any): (() -> any, (any) -> ())
-        local slot = #handle._states + 1
-        handle._states[slot] = initialValue
-        return
-            function(): any return handle._states[slot] end,
-            function(v: any)
-                if handle._states[slot] == v then return end
-                handle._states[slot] = v
-                task.defer(function() handle:Render() end)
-            end
-    end
-
     _registry[name] = handle
     return handle
 end
