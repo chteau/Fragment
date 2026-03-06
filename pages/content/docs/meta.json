@@ -16,6 +16,7 @@
         "---Public API---",
         "API/Fragment",
         "API/Handle",
+        "API/Component",
         "API/Context",
         "API/Container",
         "API/Compose"
