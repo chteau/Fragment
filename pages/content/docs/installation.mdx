@@ -26,7 +26,7 @@ Open the ModuleScript and paste the [Fragment source code](https://github.com/ch
 
 ### Create your project folder
 
-Create a folder somewhere under **StarterPlayerScripts** — for example `MySuperDuperUI`. This is where your Handles, Stores, Hooks and Contexts will live.
+Create a folder somewhere under **StarterPlayerScripts** — for example `MySuperDuperUI`. This is where your Handles, Stores, Hooks, Contexts and Components will live.
 
 </Step>
 </Steps>
@@ -39,13 +39,15 @@ Create a folder somewhere under **StarterPlayerScripts** — for example `MySupe
 StarterPlayerScripts/
 └── MySuperDuperUI/
     ├── FragmentLoad.client.luau
-    ├── Handles/
-    │   └── ...
     ├── Stores/
     │   └── ...
     ├── Contexts/
     │   └── ...
-    └── Hooks/
+    ├── Hooks/
+    │   └── ...
+    ├── Components/
+    │   └── ...
+    └── Handles/
         └── ...
 ```
 
@@ -53,20 +55,33 @@ StarterPlayerScripts/
 
 ## Initialize Fragment
 
-Create `FragmentLoad.client.luau` as a `LocalScript` inside your project folder. This is the only entry point Fragment needs.
+Create `FragmentLoad.client.luau` as a `LocalScript` inside your project folder. Pass a structured table to `Fragment.load` so every folder is required in the correct dependency order with no race conditions.
 
 ```luau title="FragmentLoad.client.luau"
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Fragment = require(ReplicatedStorage.Fragment)
 
-Fragment.load(script.Parent.Handles) -- [!code highlight]
+Fragment.load({ -- [!code highlight]
+    Stores     = script.Parent.Stores, -- [!code highlight]
+    Contexts   = script.Parent.Contexts, -- [!code highlight]
+    Hooks      = script.Parent.Hooks, -- [!code highlight]
+    Components = script.Parent.Components, -- [!code highlight]
+    Handles    = script.Parent.Handles, -- [!code highlight]
+}) -- [!code highlight]
 ```
 
-`Fragment.load` walks the folder recursively, requires every `ModuleScript` it finds, and ignores anything that does not return a Handle. After loading, it runs an initial render pass on all registered Handles.
+`Fragment.load` walks every folder recursively, requires every `ModuleScript` it finds, then runs an initial render pass on all registered Handles. The structured form guarantees that Stores are registered before Contexts, Contexts before Hooks, Hooks before Components, and Components before Handles — so no module can reference something that has not been registered yet.
+
+<Callout title="All keys are optional" type="info">
+    You only need to include the folders that exist in your project. Omitting a key is safe.
+</Callout>
+
+---
+
+## Legacy single-folder usage
+
+If you already have a project that loads a single folder, that call still works unchanged.
 
 ```luau title="FragmentLoad.client.luau"
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Fragment = require(ReplicatedStorage.Fragment)
-
-Fragment.load(script.Parent.Handles) -- [!code highlight]
+Fragment.load(script.Parent.Handles)
 ```

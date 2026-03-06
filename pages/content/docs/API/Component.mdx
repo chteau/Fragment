@@ -1,0 +1,196 @@
+---
+title: Component
+description: Reusable template-backed renderer with full reactive access.
+icon: Component
+---
+
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+A Component is a reusable renderer bound to a template Instance stored in your assets. When called via `Fragment.useComponent`, the template is cloned and the renderer runs against the clone with the given props and the calling Handle — giving the Component full access to `Effect`, `Connect`, `RegisterContainer`, stores, contexts, and hooks.
+
+<Callout title="Client Only" type="info">
+    Components are part of the Fragment reactive system and only run on the client.
+</Callout>
+
+---
+
+# Registration
+
+## `Fragment.newComponent(name, path)`
+
+Creates a new Component definition. The path resolves from the DataModel root (`game`).
+
+<TypeTable
+  type={{
+    newComponent: {
+      description: "Creates a new Component definition bound to a template path resolved from game root.",
+      type: "(name: string, path: { string }) -> Component"
+    }
+  }}
+/>
+
+Call the returned Component with a renderer to complete registration.
+
+```luau title="Components/ItemCard.luau"
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Fragment = require(ReplicatedStorage.Fragment)
+
+local Component = Fragment.newComponent("ItemCard", {
+    "ReplicatedStorage", "BE_Shared", "Assets", "UI", "ItemCardTemplate"
+})
+
+return Component(function(element: Frame, props: {
+    Id:    string,
+    Name:  string,
+    Price: number,
+}, handle: any)
+    element.Name = props.Id
+    element:FindFirstChild("NameLabel").Text  = props.Name
+    element:FindFirstChild("PriceLabel").Text = `🪙 {props.Price}`
+end)
+```
+
+---
+
+# Renderer signature
+
+```luau
+function(element: Instance, props: { [string]: any }, handle: any)
+```
+
+<TypeTable
+  type={{
+    element: {
+      description: "The cloned template instance. Unparented — the caller parents it via a Container.",
+      type: "Instance"
+    },
+    props: {
+      description: "The props table passed to useComponent at the call site.",
+      type: "{ [string]: any }"
+    },
+    handle: {
+      description: "The active Handle that called useComponent. Gives access to Effect, Connect, RegisterContainer, bind, derive, hold, await, pull, and useStore.",
+      type: "Handle"
+    }
+  }}
+/>
+
+---
+
+# Render-cycle access
+
+Because the Handle is forwarded, a Component renderer has access to the same full set of render-cycle methods as the Handle's own renderer.
+
+## Effects
+
+```luau title="Components/LiveTimer.luau"
+return Component(function(element, props, handle)
+    handle.Effect(function() -- [!code highlight]
+        local conn = RunService.Heartbeat:Connect(function()
+            element.Text = os.date("%H:%M:%S")
+        end)
+        return function()
+            conn:Disconnect()
+        end
+    end) -- [!code highlight]
+end)
+```
+
+## Connections
+
+```luau title="Components/BuyButton.luau"
+return Component(function(element, props, handle)
+    handle.Connect("Buy_" .. props.Id, element.Activated, function() -- [!code highlight]
+        ShopService:PurchaseAsync(props.Id)
+    end) -- [!code highlight]
+end)
+```
+
+## Stores
+
+```luau title="Components/CoinBadge.luau"
+return Component(function(element, props, handle)
+    local store = Fragment.useStore("PlayerData") -- [!code highlight]
+    element.Text = `🪙 {store.getData().coins}`
+end)
+```
+
+## Contexts
+
+```luau title="Components/CloseButton.luau"
+local WindowContext = require(path.to.Contexts.WindowContext)
+
+return Component(function(element, props, handle)
+    local win = handle:pull(WindowContext) -- [!code highlight]
+
+    handle.Connect("Close_" .. props.windowName, element.Activated, function()
+        win.close(props.windowName) -- [!code highlight]
+    end)
+end)
+```
+
+## Hooks
+
+```luau title="Components/ToggleRow.luau"
+local useToggle = require(path.to.Hooks.useToggle)
+
+return Component(function(element, props, handle)
+    local isOn, toggle = useToggle(props.initialState) -- [!code highlight]
+
+    element.Toggle.Active = isOn()
+
+    handle.Connect("Toggle_" .. props.id, element.Toggle.Activated, function()
+        toggle()
+    end)
+end)
+```
+
+## Nested Containers
+
+Components can register their own Containers to manage dynamic children.
+
+```luau title="Components/InventorySection.luau"
+return Component(function(element, props, handle)
+    local list = handle.RegisterContainer(element.ItemList) -- [!code highlight]
+
+    for _, item in ipairs(props.items) do
+        local row = Fragment.useComponent("ItemRow", { id = item.id, name = item.name })
+        list.UpsertChild(item.id, row)
+    end
+end)
+```
+
+---
+
+# Usage
+
+## `Fragment.useComponent(name, props)`
+
+Clones the registered template, runs the renderer, and returns the unparented clone. Always pass the result to a Container via `UpsertChild`.
+
+<TypeTable
+  type={{
+    useComponent: {
+      description: "Clones and renders a registered Component. Returns the unparented instance, or nil on failure.",
+      type: "(name: string, props: { [string]: any }) -> Instance?"
+    }
+  }}
+/>
+
+```luau title="Handles/ShopHandle.luau"
+local grid = Handle.RegisterContainer(element.ItemGrid)
+
+for _, item in ipairs(data.items) do
+    local card = Fragment.useComponent("ItemCard", { -- [!code highlight]
+        Id    = item.id, -- [!code highlight]
+        Name  = item.displayName, -- [!code highlight]
+        Price = item.price, -- [!code highlight]
+    }) -- [!code highlight]
+    grid.UpsertChild(item.id, card)
+end
+```
+
+<Callout title="useComponent is safe anywhere" type="info">
+    `useComponent` can be called in the renderer body, inside an `Effect` callback, or inside an `Action` handler. The active Handle is captured at call time.
+</Callout>

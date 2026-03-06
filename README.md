@@ -16,7 +16,7 @@
     <br/>
 </div>
 
-Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, globals stores which allow you to build reactive user interfaces whilst still using default Roblox's UI components.
+Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, globals stores, re-usable components which allow you to build reactive user interfaces whilst still using default Roblox's UI components.
 
 To learn more or get more details on the installation and available methods, [read the docs](https://chteau.github.io/Fragment/) here.
 
@@ -36,6 +36,8 @@ Once you installed Fragment and created the folder (e.g., `MySuperDuperUI`), you
 └── StarterPlayerScripts/
     └── MySuperDuperUI/
         ├── FragmentLoad.client.luau -- This will be used to init a Fragment singleton instance
+        ├── Components/
+        │   └── ...
         ├── Handles/
         │   └── ...
         ├── Hooks/
@@ -49,8 +51,14 @@ Now, in `FragmentLoad.client.luau` :: `LocalScript` you can now directly require
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Fragment = require(ReplicatedStorage.Fragment)
 
--- Load your handles here!
-Fragment.load(script.Parent.Handles)
+-- Load all your modulescripts here!
+Fragment.load({
+    Stores = script.Parent.Stores,
+    Contexts = script.Parent.Contexts,
+    Hooks = script.Parent.Hooks,
+    Components = script.Parent.Components,
+    Handles = script.Parent.Handles,
+})
 ```
 
 That's it! You can see a bit of the API references and some examples in this readme or you can head to the [Github Wiki](https://chteau.github.io/Fragment/) to find out how it works in details.
@@ -118,6 +126,32 @@ local useWindow = Fragment.compose(function(handle, windowName)
   end, { ctx.active })
 
   return isOpen, ctx
+end)
+```
+
+### 5. Re-usable Components
+You can finally create re-usable components you can call through your different handles.
+```luau
+-- New Component
+local Component = Fragment.newComponent("ListItem", { "ScreenGui", "Assets", "ListItem" })
+
+return Component(function(element, props)
+     element.Text = props.Price
+end)
+```
+```luau
+local Handle = Fragment.newHandle(..., ...)
+
+return Handle(function(element)
+    local Store = Fragment.useStore(...)
+    local Data = Store.getData()
+
+    local Container = Handle.RegisterContainer(...)
+    for _, entry in Data.Entries do
+        local Item = Fragment.useComponent(name, { Price = math.random() }) -- Automatically returns a clone
+        local live = Container.UpsertChild(Item)
+        -- ...
+    end
 end)
 ```
 

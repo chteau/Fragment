@@ -1,0 +1,208 @@
+---
+title: Create a Component
+description: Build reusable template-backed renderers with full reactive access.
+icon: Layers
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+A Component packages a template Instance and its rendering logic into a reusable unit. Where a Handle is bound to one specific UI path, a Component is cloned on demand and can be used inside any Handle or other Component.
+
+Components receive the calling Handle as a third argument, giving them full access to `Effect`, `Connect`, `RegisterContainer`, stores, contexts, and hooks — exactly the same as the Handle's own renderer.
+
+---
+
+<Steps>
+<Step>
+
+### Add a template to your assets
+
+Place the template Instance you want to clone somewhere accessible in `ReplicatedStorage`. For example:
+
+```
+ReplicatedStorage/
+└── Assets/
+    └── UI/
+        └── ItemCardTemplate  ← your Frame here
+```
+
+</Step>
+<Step>
+
+### Create the Component module
+
+Add a `ModuleScript` inside your `Components/` folder.
+
+```luau title="Components/ItemCard.luau"
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Fragment = require(ReplicatedStorage.Fragment)
+
+local Component = Fragment.newComponent("ItemCard", {
+    "ReplicatedStorage", "Assets", "UI", "ItemCardTemplate" -- [!code highlight]
+})
+
+return Component(function(element: Frame, props: {
+    Id:    string,
+    Name:  string,
+    Price: number,
+}, handle: any)
+    element.Name = props.Id
+    element:FindFirstChild("NameLabel").Text  = props.Name
+    element:FindFirstChild("PriceLabel").Text = `🪙 {props.Price}`
+end)
+```
+
+`newComponent` takes:
+- **name** — unique identifier used with `Fragment.useComponent`
+- **path** — child names traversed from `game` root to the template Instance
+
+</Step>
+<Step>
+
+### Register it with the structured loader
+
+Add your `Components` folder to `Fragment.load`. Components are loaded after Contexts and Hooks but before Handles, so they can reference anything that came before them.
+
+```luau title="FragmentLoad.client.luau"
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Fragment = require(ReplicatedStorage.Fragment)
+
+Fragment.load({
+    Stores     = script.Parent.Stores,
+    Contexts   = script.Parent.Contexts,
+    Hooks      = script.Parent.Hooks,
+    Components = script.Parent.Components, -- [!code highlight]
+    Handles    = script.Parent.Handles,
+})
+```
+
+</Step>
+<Step>
+
+### Use it inside a Handle
+
+Call `Fragment.useComponent` to clone and render the Component, then hand the result to a Container.
+
+```luau title="Handles/ShopHandle.luau"
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Fragment = require(ReplicatedStorage.Fragment)
+
+local Handle = Fragment.newHandle("Shop", { "HUD", "Shop", "MainFrame" })
+
+return Handle(function(element: Frame)
+    local store = Fragment.useStore("Shop")
+    local data  = store.getData()
+
+    local grid = Handle.RegisterContainer(element.ItemGrid)
+
+    for _, item in ipairs(data.items) do
+        local card = Fragment.useComponent("ItemCard", { -- [!code highlight]
+            Id    = item.id, -- [!code highlight]
+            Name  = item.displayName, -- [!code highlight]
+            Price = item.price, -- [!code highlight]
+        }) -- [!code highlight]
+        grid.UpsertChild(item.id, card) -- [!code highlight]
+    end
+end)
+```
+
+</Step>
+</Steps>
+
+---
+
+## Adding reactive behaviour
+
+Because the Handle is forwarded to the Component renderer, you can register Effects, Connections, and anything else you would use in a Handle.
+
+```luau title="Components/ItemCard.luau"
+return Component(function(element: Frame, props: {
+    Id:    string,
+    Name:  string,
+    Price: number,
+}, handle: any)
+    element.Name = props.Id
+    element:FindFirstChild("NameLabel").Text  = props.Name
+    element:FindFirstChild("PriceLabel").Text = `🪙 {props.Price}`
+
+    handle.Connect("Buy_" .. props.Id, element.BuyBtn.Activated, function() -- [!code highlight]
+        ShopService:PurchaseAsync(props.Id) -- [!code highlight]
+    end) -- [!code highlight]
+end)
+```
+
+<Callout title="Use unique connection names" type="warn">
+    Connections are stored on the Handle, not the Component. When the same Component is used multiple times in the same Handle, include the item's unique ID in the connection name — e.g. `"Buy_" .. props.Id` — to avoid one slot overwriting another.
+</Callout>
+
+---
+
+## Subscribing to a Store
+
+```luau title="Components/CoinBadge.luau"
+return Component(function(element, props, handle)
+    local store = Fragment.useStore("PlayerData") -- [!code highlight]
+    local data  = store.getData()
+
+    element.Text = `🪙 {data.coins}`
+end)
+```
+
+---
+
+## Subscribing to a Context
+
+```luau title="Components/CloseButton.luau"
+local WindowContext = require(path.to.Contexts.WindowContext)
+
+return Component(function(element, props, handle)
+    local win = handle:pull(WindowContext) -- [!code highlight]
+
+    handle.Connect("Close_" .. props.windowName, element.Activated, function()
+        win.close(props.windowName)
+    end)
+end)
+```
+
+---
+
+## Using a Hook
+
+```luau title="Components/ToggleRow.luau"
+local useToggle = require(path.to.Hooks.useToggle)
+
+return Component(function(element, props, handle)
+    local isOn, toggle = useToggle(props.initialState) -- [!code highlight]
+
+    element.Toggle.Active = isOn()
+
+    handle.Connect("Toggle_" .. props.id, element.Toggle.Activated, function()
+        toggle()
+    end)
+end)
+```
+
+---
+
+## Nested Components and Containers
+
+A Component can register its own Container and nest further Components inside it.
+
+```luau title="Components/InventorySection.luau"
+return Component(function(element, props, handle)
+    local list = handle.RegisterContainer(element.ItemList) -- [!code highlight]
+
+    for _, item in ipairs(props.items) do
+        local row = Fragment.useComponent("ItemRow", { -- [!code highlight]
+            id   = item.id, -- [!code highlight]
+            name = item.name, -- [!code highlight]
+        }) -- [!code highlight]
+        list.UpsertChild(item.id, row)
+    end
+end)
+```
+
+---
+
+For the full Component API see the [Component reference](/API/Component).

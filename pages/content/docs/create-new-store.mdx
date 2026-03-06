@@ -42,17 +42,18 @@ end)
 
 `set(partial)` does a shallow merge into the store and re-renders all subscribed Handles. `get()` returns the full live store table.
 
-<Callout title="Require before loading Handles" type="warn">
-    Stores must be required before `Fragment.load` is called. Do this explicitly at the top of `FragmentLoad.client.luau`.
+<Callout title="Use the structured loader" type="info">
+    When using `Fragment.load({ Stores = ..., Handles = ... })`, Stores are required before Handles automatically — no manual require needed.
 </Callout>
 
 ```luau title="FragmentLoad.client.luau"
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Fragment = require(ReplicatedStorage.Fragment)
 
-require(script.Parent.Stores.PlayerDataStore) -- [!code highlight]
-
-Fragment.load(script.Parent.Handles)
+Fragment.load({
+    Stores  = script.Parent.Stores,  -- required first -- [!code highlight]
+    Handles = script.Parent.Handles,
+})
 ```
 
 ---
@@ -81,6 +82,15 @@ end)
     Calling `useStore` inside a renderer subscribes the Handle. You do not need to manually unsubscribe — Fragment manages this for you.
 </Callout>
 
+Stores are also available inside Component renderers via the `handle` argument:
+
+```luau title="Components/CoinDisplay.luau"
+return Component(function(element, props, handle)
+    local store = Fragment.useStore("PlayerData") -- [!code highlight]
+    element.Text = `🪙 {store.getData().coins}`
+end)
+```
+
 ---
 
 ## Mutating store data from a signal
@@ -107,10 +117,11 @@ A common pattern is to populate the store when external data arrives — for exa
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Fragment = require(ReplicatedStorage.Fragment)
 
-require(script.Parent.Stores.PlayerDataStore)
-Fragment.load(script.Parent.Handles)
+Fragment.load({
+    Stores  = script.Parent.Stores,
+    Handles = script.Parent.Handles,
+})
 
--- When server data arrives, push it into the store
 local store = Fragment.useStore("PlayerData")
 ReplicaService.ReplicaOfClassCreated("PlayerData", function(replica)
     store.setCoins(replica.Data.Coins) -- [!code highlight]

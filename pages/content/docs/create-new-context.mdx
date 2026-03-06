@@ -1,6 +1,6 @@
 ---
 title: Create a Context
-description: Shared reactive value objects consumed by any Handle.
+description: Shared reactive value objects consumed by any Handle or Component.
 icon: Share2
 ---
 
@@ -24,7 +24,6 @@ local WindowContext = Fragment.createContext({ -- [!code highlight]
     active = nil :: string?, -- [!code highlight]
 }) -- [!code highlight]
 
--- Optional additional methods for the context.
 WindowContext._value.open = function(name: string)
     WindowContext:patch({ active = name })
 end
@@ -46,19 +45,21 @@ end
 return WindowContext
 ```
 
-`Fragment.DELETE` removes the key from the value table entirely when passed to `patch`. Methods added to `_value` are available to any Handle that pulls from the Context.
+`Fragment.DELETE` removes the key from the value table entirely when passed to `patch`. Methods added to `_value` are available to any Handle or Component that pulls from the Context.
 
-<Callout title="Require before loading Handles" type="warn">
-    Contexts must be required before `Fragment.load` is called, as Handles may pull from them during their first render.
+<Callout title="Use the structured loader" type="info">
+    When using `Fragment.load({ Contexts = ..., Handles = ... })`, Contexts are required before Handles automatically — no manual require needed.
 </Callout>
 
 ```luau title="FragmentLoad.client.luau"
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Fragment = require(ReplicatedStorage.Fragment)
 
-require(script.Parent.Contexts.WindowContext) -- [!code highlight]
-
-Fragment.load(script.Parent.Handles)
+Fragment.load({
+    Contexts   = script.Parent.Contexts,   -- required before Handles -- [!code highlight]
+    Components = script.Parent.Components,
+    Handles    = script.Parent.Handles,
+})
 ```
 
 ---
@@ -94,15 +95,29 @@ return Handle(function(element: Frame)
 end)
 ```
 
+Contexts work identically inside Component renderers via the `handle` argument:
+
+```luau title="Components/CloseButton.luau"
+local WindowContext = require(path.to.Contexts.WindowContext)
+
+return Component(function(element, props, handle)
+    local win = handle:pull(WindowContext) -- [!code highlight]
+
+    handle.Connect("Close_" .. props.windowName, element.Activated, function()
+        win.close(props.windowName) -- [!code highlight]
+    end)
+end)
+```
+
 ---
 
 ## Patching the Context directly
 
-Call `ctx:patch(partial)` on the Context itself to merge values and notify all subscribed Handles. This is how the methods defined in the Context body work under the hood.
+Call `ctx:patch(partial)` on the Context itself to merge values and notify all subscribed Handles and Components. This is how the methods defined in the Context body work under the hood.
 
 ```luau
-WindowContext:patch({ active = "Shop" })  -- open shop
-WindowContext:patch({ active = Fragment.DELETE })  -- close all
+WindowContext:patch({ active = "Shop" })         -- open shop
+WindowContext:patch({ active = Fragment.DELETE }) -- close all
 ```
 
 ---
