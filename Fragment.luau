@@ -66,6 +66,8 @@ local _data:          Data = {}
 local _failedHandles: { [string]: true } = {}
 local _handleCount:   number = 0
 
+local _components:    { [string]: any } = {}
+
 -- Store related variables
 local _stores:           { [string]: any } = {}
 local _storeSubscribers: { [string]: { [string]: any } } = {}
@@ -73,6 +75,17 @@ local _activeHandle:     any = nil
 
 -- Context system counter
 local _contextCount: number = 0
+
+-- Component instance lifecycle
+-- Each live component instance (parented into a container) owns a ComponentInstance
+-- that manages its own Effects, Connections, bind/derive/hold slots, and Once flag.
+-- Weak keys let the Lua GC reclaim entries for instances that were destroyed without
+-- going through a container (safety net — the real cleanup is Destroying:Connect).
+local _componentInstanceCount: number = 0
+local _componentInstances: { [Instance]: any } = setmetatable({}, { __mode = "k" })
+
+-- Forward-declared so makeContainer closures can reference it before it is assigned.
+local renderComponentInstance: (ci: any, props: { [string]: any }) -> ()
 
 -- Marker for uninitialized  values
 local UNSET = {}
@@ -133,6 +146,15 @@ local function makeContainer(parent: Instance): any
         local existing = c._children[key]
 
         if existing and existing.Parent ~= nil then
+            -- If both instances have ComponentInstance contexts, re-render the
+            -- surviving (existing) one with the fresh props carried by the incoming
+            -- clone.  This is what gives components their own reactive lifecycle:
+            -- the live instance is updated in-place rather than left stale.
+            local existingCI = _componentInstances[existing]
+            local incomingCI = _componentInstances[incoming]
+            if existingCI and incomingCI then
+                renderComponentInstance(existingCI, incomingCI._props)
+            end
             incoming:Destroy()
             return existing
         else
@@ -301,6 +323,10 @@ function HandleMethods._Resolve(self: any): boolean
     if not self._visibilityHooksConnected and self._element then
         self._visibilityHooksConnected = true
         local function onVisibilityChanged()
+            -- The renderer itself may set element.Visible, which fires this
+            -- signal synchronously mid-render.  Skipping re-entrant calls here
+            -- prevents the double-render that causes effects to run twice.
+            if self._rendering then return end
             self:Render()
         end
 
@@ -374,9 +400,10 @@ function HandleMethods._RegisterActionsOnly(self: any)
     rawset(self, "Connect", noop)
     rawset(self, "RegisterContainer", noop)
 
+    local prevHandle = _activeHandle
     _activeHandle = self
     local mountOk, mountErr = pcall(self._renderer, self._element :: Instance, _data)
-    _activeHandle = nil
+    _activeHandle = prevHandle
 
     rawset(self, "Effect", self._warnEffect)
     rawset(self, "Action", self._warnAction)
@@ -397,6 +424,9 @@ end
     @param any self - The handle instance
 ]]
 function HandleMethods.Render(self: any): ()
+    if self._rendering then return end
+    self._rendering = true
+
     for _, cleanup in pairs(self._cleanups) do
         local ok, err = pcall(cleanup)
         if not ok then
@@ -449,36 +479,37 @@ function HandleMethods.Render(self: any): ()
         end
 
         local container = self._containers[frame]
-        local activeEffect = rawget(self, "Effect")
-        activeEffect(function(): (() -> ())?
-            return function()
-                for key, child in pairs(container._children) do
-                    if not container._touchedKeys[key] then
-                        child:Destroy()
-                        container._children[key] = nil
-                    end
-                end
-                table.clear(container._touchedKeys)
-            end
-        end)
+
+        -- Queue this container for reconciliation at the END of the current
+        -- render pass (after effects).  We no longer store a deferred cleanup
+        -- function because that ran at the START of the NEXT render — meaning
+        -- a sold/removed item would stay visible until a second render occurred.
+        -- End-of-render reconciliation removes untouched children immediately,
+        -- in the same frame that the renderer decided they were gone.
+        table.insert(self._pendingContainers, container)
+
         return container
     end)
 
+    local prevHandle = _activeHandle
     _activeHandle = self
     local rendOk, rendErr = pcall(self._renderer, self._element :: Instance, _data)
-    _activeHandle = nil
+    _activeHandle = prevHandle
 
     rawset(self, "Effect", self._warnEffect)
     rawset(self, "Action", self._warnAction)
     rawset(self, "Once", self._warnOnce)
     rawset(self, "Connect", self._warnConnect)
-    rawset(self, "RegisterContainer", self._warnRegisterContainer)
 
     if not rendOk then
         warn(`[Fragment] "{self._name}": renderer error — {rendErr}`)
+        rawset(self, "RegisterContainer", self._warnRegisterContainer)
+        self._rendering = false
         return
     end
 
+    local prevHandle2 = _activeHandle
+    _activeHandle = self
     for i, effectFn in ipairs(self._effects) do
         local effOk, result = pcall(effectFn)
 
@@ -490,6 +521,27 @@ function HandleMethods.Render(self: any): ()
             warn(`[Fragment] "{self._name}": effect #{i} error — {result}`)
         end
     end
+    _activeHandle = prevHandle2
+
+    rawset(self, "RegisterContainer", self._warnRegisterContainer)
+
+    -- Reconcile all containers that were registered during this render pass.
+    -- Any child whose key was not touched (i.e. not present in the new data)
+    -- is destroyed immediately — same frame, same render — rather than waiting
+    -- until the start of the next render where a second store change would be
+    -- required to trigger it.
+    for _, container in ipairs(self._pendingContainers) do
+        for key, child in pairs(container._children) do
+            if not container._touchedKeys[key] then
+                child:Destroy()
+                container._children[key] = nil
+            end
+        end
+        table.clear(container._touchedKeys)
+    end
+    table.clear(self._pendingContainers)
+
+    self._rendering = false
 end
 
 --[[
@@ -693,6 +745,236 @@ function HandleMethods.pull(self: any, ctx: any): any
     return ctx._value
 end
 
+-- ─── Component Instance Lifecycle ────────────────────────────────────────────
+--
+-- A ComponentInstance (CI) is a lightweight, self-contained lifecycle context
+-- owned by a single live component instance (a parented clone).  It mirrors the
+-- handle API — Effect, Connect, Once, RegisterContainer, bind, derive, hold,
+-- await, pull — but is scoped entirely to one UI instance rather than a whole
+-- screen handle.
+--
+-- Lifecycle:
+--   mount   — CI is created and its renderer runs the first time the clone is
+--             inserted into a container via UpsertChild / InsertChild.
+--   update  — UpsertChild receives a new clone for an existing key; instead of
+--             returning the stale existing instance, it re-runs the CI's renderer
+--             with the new props (running cleanup first, then fresh effects).
+--   unmount — instance.Destroying fires (triggered by DeleteChild, ClearChildren,
+--             or any explicit :Destroy call), running all cleanups and disconnecting
+--             all connections.  The CI entry is removed from _componentInstances.
+--
+-- bind/derive/hold/await/pull are shared directly from HandleMethods because
+-- they are generic: they only access self._slots, self._slotIdx, self._id,
+-- self._name, self._ctxSubs, and call self:Render() — all present on a CI.
+
+local ComponentInstanceMethods = {}
+local ComponentInstanceMeta    = { __index = ComponentInstanceMethods }
+
+-- Reuse handle slot/context hooks verbatim — they work on any object that
+-- exposes the same fields and a :Render() method.
+ComponentInstanceMethods.bind   = HandleMethods.bind
+ComponentInstanceMethods.derive = HandleMethods.derive
+ComponentInstanceMethods.hold   = HandleMethods.hold
+ComponentInstanceMethods.await  = HandleMethods.await
+ComponentInstanceMethods.pull   = HandleMethods.pull
+
+--[[
+    Re-renders this component instance with its last-known props.
+    Called by bind/await setters when reactive state changes.
+]]
+function ComponentInstanceMethods.Render(self: any)
+    renderComponentInstance(self, self._props)
+end
+
+--[[
+    Creates a ComponentInstance for the given live instance.
+
+    Sets up warn stubs for all lifecycle methods (swapped out for real
+    implementations during a render pass), and registers a Destroying
+    listener for guaranteed cleanup when the instance leaves the DataModel.
+
+    @param string   componentName - Name of the component definition
+    @param Instance instance      - The live (parented or soon-to-be-parented) clone
+    @returns any - The new ComponentInstance
+]]
+local function createComponentInstance(componentName: string, instance: Instance): any
+    _componentInstanceCount += 1
+
+    local ci: any = setmetatable({
+        _id            = `ComponentInstance_{_componentInstanceCount}`,
+        _name          = componentName,   -- used by shared HandleMethods warn strings
+        _componentName = componentName,
+        _instance      = instance,
+        _props         = {},
+        _effects       = {},
+        _cleanups      = {},
+        _connections   = {},
+        _containers    = {},
+        _pendingContainers = {},
+        _slots         = {},
+        _slotIdx       = 0,
+        _onceFired     = false,
+        _ctxSubs       = {},
+    }, ComponentInstanceMeta)
+
+    -- Warn stubs — active outside of a render pass so accidental calls are caught.
+    ci._warnEffect            = function() warn(`[Fragment] Component "{componentName}" instance: Effect called outside a renderer — ignored.`) end
+    ci._warnConnect           = function() warn(`[Fragment] Component "{componentName}" instance: Connect called outside a renderer — ignored.`) end
+    ci._warnOnce              = function() warn(`[Fragment] Component "{componentName}" instance: Once called outside a renderer — ignored.`) end
+    ci._warnRegisterContainer = function() warn(`[Fragment] Component "{componentName}" instance: RegisterContainer called outside a renderer — ignored.`) end
+
+    ci.Effect            = ci._warnEffect
+    ci.Connect           = ci._warnConnect
+    ci.Once              = ci._warnOnce
+    ci.RegisterContainer = ci._warnRegisterContainer
+
+    -- Guaranteed unmount: fires on :Destroy(), DeleteChild, ClearChildren, or any
+    -- external destruction.  Runs all effect cleanups and disconnects every
+    -- connection so nothing outlives the instance.
+    instance.Destroying:Connect(function()
+        _componentInstances[instance] = nil
+
+        for _, cleanup in pairs(ci._cleanups) do
+            pcall(cleanup)
+        end
+        table.clear(ci._cleanups)
+
+        for _, conn in pairs(ci._connections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        table.clear(ci._connections)
+    end)
+
+    _componentInstances[instance] = ci
+    return ci
+end
+
+--[[
+    Runs a full render pass on a ComponentInstance.
+
+    Order of operations mirrors HandleMethods.Render:
+      1. Run effect cleanups from the previous pass.
+      2. Reset slot index (bind/derive/hold slots are positional).
+      3. Store incoming props on the CI for reactive re-renders (bind/await).
+      4. Activate lifecycle methods (Effect, Connect, Once, RegisterContainer).
+      5. Set _activeHandle = ci so Fragment.compose / useStore / useComponent
+         all work correctly inside the component renderer.
+      6. Call component._renderer(instance, props, ci).
+      7. Restore _activeHandle and deactivate lifecycle methods back to warn stubs.
+      8. Run collected effects and store their cleanup functions.
+
+    @param any                  ci    - The ComponentInstance to render
+    @param { [string]: any }    props - Props to pass to the renderer
+]]
+renderComponentInstance = function(ci: any, props: { [string]: any })
+    -- 1. Cleanup from previous render: run effect teardowns then disconnect all
+    --    connections.  Both are cleared unconditionally before the renderer runs,
+    --    giving a clean slate on every pass.  If the renderer subsequently errors,
+    --    nothing from the previous pass is left alive — preventing the stale
+    --    connection accumulation that occurs when a renderer fails mid-pass.
+    for _, cleanup in pairs(ci._cleanups) do
+        local ok, err = pcall(cleanup)
+        if not ok then
+            warn(`[Fragment] Component "{ci._componentName}" instance: effect cleanup error — {err}`)
+        end
+    end
+    table.clear(ci._cleanups)
+
+    for _, conn in pairs(ci._connections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    table.clear(ci._connections)
+
+    -- 2. Reset slot index so bind/derive/hold slots line up correctly
+    ci._slotIdx = 0
+
+    -- 3. Store props for reactive re-renders triggered by bind/await
+    ci._props = props
+
+    -- 4. Collect effects during this pass
+    table.clear(ci._effects)
+    local effectIdx = 0
+
+    rawset(ci, "Effect", function(fn: EffectFn)
+        effectIdx += 1
+        ci._effects[effectIdx] = fn
+    end)
+
+    rawset(ci, "Connect", function(connName: string, signal: RBXScriptSignal, callback: (...any) -> ())
+        local existing = ci._connections[connName]
+        if existing then existing:Disconnect() end
+        ci._connections[connName] = signal:Connect(callback)
+    end)
+
+    rawset(ci, "Once", function(fn: () -> ())
+        if not ci._onceFired then
+            ci._onceFired = true
+            local ok, err = pcall(fn)
+            if not ok then
+                warn(`[Fragment] Component "{ci._componentName}" instance: Once error — {err}`)
+            end
+        end
+    end)
+
+    rawset(ci, "RegisterContainer", function(frame: Instance): any
+        if not ci._containers[frame] then
+            ci._containers[frame] = makeContainer(frame)
+        end
+        local container = ci._containers[frame]
+        table.insert(ci._pendingContainers, container)
+        return container
+    end)
+
+    -- 5 & 6. Run renderer with _activeHandle set to this CI so all
+    --        Fragment.compose hooks (useHoverScale, useStore, etc.) bind to it.
+    local component = _components[ci._componentName]
+    local prevHandle = _activeHandle
+    _activeHandle = ci
+    local rendOk, rendErr = pcall(component._renderer, ci._instance, props, ci)
+    _activeHandle = prevHandle
+
+    -- 7. Swap lifecycle methods back to warn stubs
+    rawset(ci, "Effect",            ci._warnEffect)
+    rawset(ci, "Connect",           ci._warnConnect)
+    rawset(ci, "Once",              ci._warnOnce)
+    rawset(ci, "RegisterContainer", ci._warnRegisterContainer)
+
+    if not rendOk then
+        warn(`[Fragment] Component "{ci._componentName}" instance: renderer error — {rendErr}`)
+        table.clear(ci._pendingContainers)
+        return
+    end
+
+    -- 8. Run collected effects, store cleanup functions
+    local prevHandle2 = _activeHandle
+    _activeHandle = ci
+    for i, effectFn in ipairs(ci._effects) do
+        local effOk, result = pcall(effectFn)
+        if effOk then
+            if type(result) == "function" then
+                ci._cleanups[i] = result :: () -> ()
+            end
+        else
+            warn(`[Fragment] Component "{ci._componentName}" instance: effect #{i} error — {result}`)
+        end
+    end
+    _activeHandle = prevHandle2
+
+    -- 9. Reconcile component-owned containers (same end-of-render logic as handles)
+    for _, container in ipairs(ci._pendingContainers) do
+        for key, child in pairs(container._children) do
+            if not container._touchedKeys[key] then
+                child:Destroy()
+                container._children[key] = nil
+            end
+        end
+        table.clear(container._touchedKeys)
+    end
+    table.clear(ci._pendingContainers)
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+
 -- Fragment module definition
 local Fragment = {}
 
@@ -858,12 +1140,14 @@ function Fragment.newHandle(name: string, path: { string }): any
         _actionsRegistered = false,
         _connections = {},
         _containers = {},
+        _pendingContainers = {},
         _states = {},
         _slots = {},
         _slotIdx = 0,
         _ctxSubs = {},
         _visibilityHooksConnected = false,
         _visibilityConnections = {},
+        _rendering = false,
 
         _warnEffect = nil,
         _warnAction = nil,
@@ -919,27 +1203,51 @@ function Fragment.dispatchAll(): ()
 end
 
 --[[
-    Loads and initializes handles from a folder (recursively, allows subfolders and such).
+    Loads and initializes all Fragment modules.
 
-    @param Instance folder - Folder containing ModuleScripts
+    Accepts either a single folder (legacy) or a structured table of folders.
+
+    Legacy usage — retro-compatible, unchanged behaviour:
+        Fragment.load(script.Parent.Handles)
+
+    Structured usage — loads in guaranteed dependency order with no race conditions:
+        Fragment.load({
+            Stores     = script.Parent.Stores,
+            Contexts   = script.Parent.Contexts,
+            Hooks      = script.Parent.Hooks,
+            Components = script.Parent.Components,
+            Handles    = script.Parent.Handles,
+        })
+
+    All keys are optional. When using the structured form, folders are required
+    in the order listed above so every dependency is registered before anything
+    that references it is loaded. Handles are always last.
+
+    @param Instance | { Stores: Instance?, Contexts: Instance?, Hooks: Instance?, Components: Instance?, Handles: Instance? } target
 ]]
-function Fragment.load(folder: Instance): ()
-    local function loadFolder(f: Instance)
+function Fragment.load(target: Instance | { [string]: Instance }): ()
+    local function requireFolder(f: Instance)
+        if not f then return end
         for _, child in ipairs(f:GetChildren()) do
             if child:IsA("ModuleScript") then
                 local ok, result = pcall(require, child :: ModuleScript)
                 if not ok then
                     warn(`[Fragment] load: failed to require "{child.Name}" — {result}`)
-
-                elseif type(result) ~= "table" or rawget(result, "_id") == nil then
-                    continue
                 end
             elseif child:IsA("Folder") then
-                loadFolder(child)
+                requireFolder(child)
             end
         end
     end
-    loadFolder(folder)
+
+    if typeof(target) == "Instance" then
+        requireFolder(target)
+    else
+        local ordered = { "Stores", "Contexts", "Hooks", "Components", "Handles" }
+        for _, key in ipairs(ordered) do
+            requireFolder((target :: any)[key])
+        end
+    end
 
     for _, handle in pairs(_registry) do
         handle:_RegisterActionsOnly()
@@ -974,6 +1282,106 @@ function Fragment.tween(
     local tween = TweenService:Create(element :: any, info, props)
     tween:Play()
     return tween
+end
+
+local ComponentMeta = {}
+
+ComponentMeta.__call = function(self: any, renderer: (element: Instance, props: { [string]: any }, handle: any) -> ()): any
+    self._renderer = renderer
+    return self
+end
+
+ComponentMeta.__index = ComponentMeta
+
+--[[
+    Creates a new reusable component definition.
+
+    Component renderers receive three arguments:
+      element — the cloned template instance
+      props   — the props table passed to useComponent
+      handle  — the calling handle, giving the component full access to
+                Effect, Action, Once, Connect, RegisterContainer, bind,
+                derive, hold, pull, useStore, and all Fragment hooks
+
+    The path resolves from the DataModel root (game), not PlayerGui, since
+    components are typically templates stored in assets folders.
+
+    @param string   name - Unique component name
+    @param {string} path - Path from game root to the template instance
+    @returns any - The component definition; call it with a renderer to complete registration
+]]
+function Fragment.newComponent(name: string, path: { string }): any
+    if _components[name] then
+        warn(`[Fragment] newComponent: "{name}" is already registered — it will be overwritten`)
+    end
+
+    local component: any = setmetatable({
+        _name     = name,
+        _path     = path,
+        _renderer = nil,
+    }, ComponentMeta)
+
+    _components[name] = component
+    return component
+end
+
+--[[
+    Clones the template for a registered component, creates a ComponentInstance
+    that owns the clone's full lifecycle, runs the component renderer through
+    that CI, and returns the clone unparented.
+
+    When the clone is subsequently passed to a container method (UpsertChild /
+    InsertChild), the container transfers or re-uses the ComponentInstance:
+
+      • First insertion — the CI is already attached; the clone is parented and
+        its Destroying listener guarantees cleanup on removal.
+
+      • Subsequent renders (UpsertChild, existing key) — the container re-renders
+        the EXISTING instance's CI with the fresh props carried by the new clone,
+        then destroys the clone (which cleans up its own transient CI via Destroying).
+
+    This means all Effect, Connect, Once, bind, derive, hold, await, pull calls
+    inside a component renderer are scoped to that specific instance — not
+    delegated to the calling handle — and the component re-renders itself
+    cleanly on every parent render pass without leaking connections or effects.
+
+    @param string            name  - Component name as passed to newComponent
+    @param { [string]: any } props - Props table forwarded to the component renderer
+    @returns Instance? - The cloned and rendered instance, or nil on failure
+]]
+function Fragment.useComponent(name: string, props: { [string]: any }): Instance?
+    if not _activeHandle then
+        warn(`[Fragment] Component "{name}": called outside a renderer — ignored.`)
+        return nil
+    end
+
+    local component = _components[name]
+    if not component then
+        warn(`[Fragment] useComponent: no component named "{name}" is registered`)
+        return nil
+    end
+
+    if not component._renderer then
+        warn(`[Fragment] useComponent: component "{name}" has no renderer`)
+        return nil
+    end
+
+    local current: Instance = game
+    for _, key in ipairs(component._path) do
+        local found = current:FindFirstChild(key)
+        if not found then
+            warn(`[Fragment] useComponent: "{name}": path broken at "{key}" (full path: {table.concat(component._path, " → ")})`)
+            return nil
+        end
+        current = found
+    end
+
+    local clone = current:Clone()
+
+    local ci = createComponentInstance(name, clone)
+    renderComponentInstance(ci, props or {})
+
+    return clone
 end
 
 -- Sentinel marker

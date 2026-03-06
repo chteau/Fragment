@@ -7,6 +7,7 @@
         "installation",
         "quick-start",
         "create-new-handle",
+        "create-new-reusable-component",
         "create-new-store",
         "create-new-context",
         "create-new-hook",

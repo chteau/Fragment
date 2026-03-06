@@ -12,7 +12,7 @@ A Container tracks child Instances by key and diffs them across renders — reus
 
 ## Register a Container
 
-Call `Handle.RegisterContainer(frame)` inside a renderer, passing the parent Instance you want to manage children inside. The Container is created once and reused on every re-render.
+Call `Handle.RegisterContainer(frame)` inside a renderer or inside an `Effect` callback, passing the parent Instance you want to manage children inside. The Container is created once and reused on every re-render.
 
 ```luau title="Handles/LeaderboardHandle.luau"
 return Handle(function(element: Frame)
@@ -20,15 +20,11 @@ return Handle(function(element: Frame)
 end)
 ```
 
-<Callout title="Inside renderer only" type="info">
-    `RegisterContainer` must be called inside the renderer. The Container persists across renders automatically — you do not need to store it outside.
-</Callout>
-
 ---
 
 ## Populate with UpsertChild
 
-`UpsertChild` is the primary method for populating a Container. It parents the clone into the frame on first render and destroys the incoming clone in re-renders and returns the already-live Instance — so your property updates always apply to the real child.
+`UpsertChild` is the primary method for populating a Container. It parents the clone into the frame on first render and returns the already-live Instance on re-renders — so your property updates always apply to the real child.
 
 ```luau title="Handles/LeaderboardHandle.luau"
 return Handle(function(element: Frame)
@@ -55,6 +51,32 @@ Children not touched via `UpsertChild` or `InsertChild` this cycle are automatic
 
 ---
 
+## Using Components inside Containers
+
+The recommended way to populate a Container is with `Fragment.useComponent`. This keeps template setup and rendering logic out of the Handle and inside a dedicated Component module.
+
+```luau title="Handles/ShopHandle.luau"
+return Handle(function(element: Frame)
+    local store = Fragment.useStore("Shop")
+    local data  = store.getData()
+
+    local grid = Handle.RegisterContainer(element.ItemGrid)
+
+    for _, item in ipairs(data.items) do
+        local card = Fragment.useComponent("ItemCard", { -- [!code highlight]
+            Id    = item.id, -- [!code highlight]
+            Name  = item.displayName, -- [!code highlight]
+            Price = item.price, -- [!code highlight]
+        }) -- [!code highlight]
+        grid.UpsertChild(item.id, card) -- [!code highlight]
+    end
+end)
+```
+
+See the [Create a Component guide](/Guides/create-new-reusable-component) for how to define the `ItemCard` Component.
+
+---
+
 ## Explicit keys
 
 When the Instance's `Name` is not a reliable unique key — for example when multiple children share the same name — pass an explicit key as the first argument.
@@ -72,13 +94,11 @@ Without an explicit key the Instance's `.Name` property is used.
 You can read any tracked child back from the Container at any time.
 
 ```luau
--- Read a single child by key
 local row = list.GetChild("player_123")
 if row then
     row.Highlight.Visible = true
 end
 
--- Iterate all tracked children
 for key, child in pairs(list.GetAllChildren()) do
     child.Active = key == selectedId
 end
@@ -103,8 +123,8 @@ end)
 Use `DeleteChild` to remove a single entry, or `ClearChildren` to wipe the entire Container.
 
 ```luau
-list.DeleteChild("player_123") -- destroy and untrack one
-list.ClearChildren()           -- destroy and untrack all
+list.DeleteChild("player_123")
+list.ClearChildren()
 ```
 
 ---
@@ -131,9 +151,8 @@ return Handle(function(element: Frame)
     end
 
     for _, item in ipairs(data.items) do
-        local live = itemGrid.UpsertChild(item.id, Assets.ItemCard:Clone())
-        live.NameLabel.Text  = item.displayName
-        live.PriceLabel.Text = `🪙 {item.price}`
+        local card = Fragment.useComponent("ItemCard", { id = item.id, price = item.price })
+        itemGrid.UpsertChild(item.id, card)
     end
 end)
 ```

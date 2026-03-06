@@ -13,6 +13,7 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 **Fragment provides**:
 - Declarative UI Handles
+- Reusable Components
 - Reactive local bindings
 - Derived state
 - Async state helpers
@@ -36,7 +37,6 @@ Sentinel value used to delete context keys.
     }
   }}
 />
-
 
 **Example**:
 ```luau title="WindowContext.luau"
@@ -72,16 +72,12 @@ return Fragment.createStore("ReplicaServiceStore", function(set, get)
         ReplicaData = {},
 
         setData = function(newData: table)
-            set({
-                ReplicaData = newData,
-            })
+            set({ ReplicaData = newData })
         end,
 
         getData = function()
             return get().ReplicaData
         end,
-
-        -- ...
     }
 end)
 ```
@@ -90,12 +86,12 @@ end)
 
 ## `useStore(name)`
 
-Returns a store and subscribes the active Handle.
+Returns a store and subscribes the active Handle or Component.
 
 <TypeTable
   type={{
     useStore: {
-      description: "Returns a store and subscribes the active Handle.",
+      description: "Returns a store and subscribes the active Handle or Component.",
       type: "(name: string) -> any"
     }
   }}
@@ -177,6 +173,73 @@ local MoneyLabelHandle = Fragment.getHandle("MoneyLabel")
 
 ---
 
+## `newComponent(name, path)`
+
+Creates a new reusable Component definition. The path resolves from the DataModel root (`game`), since Components are typically stored in assets folders.
+
+<TypeTable
+  type={{
+    newComponent: {
+      description: "Creates a new reusable Component definition bound to a template path resolved from game root.",
+      type: "(name: string, path: { string }) -> Component"
+    }
+  }}
+/>
+
+Call the returned Component with a renderer function to complete registration. The renderer receives:
+- **element** — the cloned template instance
+- **props** — the props table passed to `useComponent`
+- **handle** — the calling Handle, giving full access to `Effect`, `Connect`, `RegisterContainer`, stores, contexts, and hooks
+
+**Example**:
+```luau title="Components/SellItem.luau"
+local Component = Fragment.newComponent("SellItem", {
+    "ReplicatedStorage", "BE_Shared", "Assets", "UI", "SellTemplate"
+})
+
+return Component(function(element: Frame, props: {
+    Id:    string,
+    Price: number,
+}, handle: any)
+    element.Name = props.Id
+    element:FindFirstChild("PriceLabel").Text = `🪙 {props.Price}`
+
+    handle.Connect("Buy_" .. props.Id, element.BuyBtn.Activated, function()
+        -- ...
+    end)
+end)
+```
+
+---
+
+## `useComponent(name, props)`
+
+Clones the template for a registered Component, runs its renderer with the given props and the active Handle, and returns the unparented clone.
+
+<TypeTable
+  type={{
+    useComponent: {
+      description: "Clones and renders a registered Component. Returns the unparented instance, or nil on failure.",
+      type: "(name: string, props: { [string]: any }) -> Instance?"
+    }
+  }}
+/>
+
+**Example**:
+```luau title="Handles/ShopHandle.luau"
+local container = Handle.RegisterContainer(element.ItemGrid)
+
+for _, entry in ipairs(data.items) do
+    local item = Fragment.useComponent("SellItem", { -- [!code highlight]
+        Id    = entry.Id, -- [!code highlight]
+        Price = entry.Price, -- [!code highlight]
+    }) -- [!code highlight]
+    container.UpsertChild(entry.Id, item)
+end
+```
+
+---
+
 ## `dispatchAll()`
 
 Forces re-render of all Handles.
@@ -192,28 +255,40 @@ Forces re-render of all Handles.
 
 **Example**:
 ```luau
-Fragment.dispatchAll() -- All handles get re-rendered
+Fragment.dispatchAll()
 ```
 
 ---
 
-## `load(folder)`
+## `load(target)`
 
-Loads Handle modules recursively from a Folder.
+Loads all Fragment modules and fires the first render pass.
 
 <TypeTable
   type={{
     load: {
-      description: "Loads Handle modules recursively from a Folder.",
-      type: "(folder: Instance) -> ()"
+      description: "Loads Fragment modules in dependency order and fires the initial render pass.",
+      type: "(target: Instance | { Stores: Instance?, Contexts: Instance?, Hooks: Instance?, Components: Instance?, Handles: Instance? }) -> ()"
     }
   }}
 />
 
-**Example**:
-```luau title="InitFragment.client.luau"
-local HandlesFolder = script.Parent:FindFirstChild("Handles") :: Folder
-Fragment.load(HandlesFolder) -- [!code highlight]
+Accepts either a single folder (legacy) or a structured table of folders loaded in guaranteed dependency order: `Stores → Contexts → Hooks → Components → Handles`. All keys are optional.
+
+**Structured usage**:
+```luau title="FragmentLoad.client.luau"
+Fragment.load({ -- [!code highlight]
+    Stores     = script.Parent.Stores, -- [!code highlight]
+    Contexts   = script.Parent.Contexts, -- [!code highlight]
+    Hooks      = script.Parent.Hooks, -- [!code highlight]
+    Components = script.Parent.Components, -- [!code highlight]
+    Handles    = script.Parent.Handles, -- [!code highlight]
+}) -- [!code highlight]
+```
+
+**Legacy usage** — retro-compatible:
+```luau title="FragmentLoad.client.luau"
+Fragment.load(script.Parent.Handles)
 ```
 
 ---
@@ -233,6 +308,6 @@ Creates and plays a Tween animation.
 
 **Example**:
 ```luau
-local position = Udim2.fromScale(0.5, 0.5)
+local position = UDim2.fromScale(0.5, 0.5)
 Fragment.tween(element, 0.05, { Position = position }) -- [!code highlight]
 ```

@@ -6,7 +6,7 @@ icon: Puzzle
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-Hooks are reusable functions that package combinations of `bind`, `derive`, `hold`, `await` and `pull` into a single callable. They are created with `Fragment.compose` and can be shared across any number of Handles.
+Hooks are reusable functions that package combinations of `bind`, `derive`, `hold`, `await` and `pull` into a single callable. They are created with `Fragment.compose` and can be shared across any number of Handles and Components.
 
 <Callout title="Slot order rule" type="warn">
     Hooks follow the same rule as individual bindings — call them unconditionally, at the top of the renderer, in the same order every render.
@@ -49,11 +49,27 @@ return Handle(function(element: Frame)
 end)
 ```
 
+Hooks work identically inside Component renderers — the `handle` argument is the same active Handle:
+
+```luau title="Components/SoundToggle.luau"
+local useToggle = require(path.to.Hooks.useToggle)
+
+return Component(function(element, props, handle)
+    local soundOn, toggleSound = useToggle(props.initialState) -- [!code highlight]
+
+    element.Active = soundOn()
+
+    handle.Connect("SoundToggle_" .. props.id, element.Activated, function()
+        toggleSound()
+    end)
+end)
+```
+
 ---
 
 ## Hook backed by a Context
 
-A hook can also pull from a Context and expose the relevant slice of it. This is the recommended pattern when the same Context is accessed by many Handles in similar ways.
+A hook can also pull from a Context and expose the relevant slice of it. This is the recommended pattern when the same Context is accessed by many Handles or Components in similar ways.
 
 ```luau title="Hooks/useWindow.luau"
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -73,7 +89,7 @@ end)
 return useWindow
 ```
 
-`isOpen` is a getter that returns a fresh boolean each render, memoised against `win.active`. `win` is the full Context value table, so the caller has access to `win.open`, `win.close` and `win.toggle` as well.
+`isOpen` is a getter that returns a fresh boolean each render, memoised against `win.active`. `win` is the full Context value table, so the caller has access to `win.open`, `win.close` and `win.toggle`.
 
 ---
 
@@ -121,7 +137,7 @@ end)
 
 ## Hook with async data
 
-Hooks can wrap `await` to give you a clean loading-state pattern reusable across any Handle.
+Hooks can wrap `await` to give you a clean loading-state pattern reusable across any Handle or Component.
 
 ```luau title="Hooks/usePlayerData.luau"
 local Fragment = require(path.to.Fragment)

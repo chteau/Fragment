@@ -27,7 +27,7 @@ Handles manage:
 
 # Render-cycle methods
 
-These methods are only active **inside a renderer**. Calling them outside produces a warning and does nothing.
+These methods are only active **inside a renderer or an Effect callback**. Calling them outside produces a warning and does nothing.
 
 ## `Effect(fn)`
 
@@ -143,14 +143,17 @@ Returns a persistent [Container](/API/Container) for `frame` that diffs children
   }}
 />
 
+<Callout title="Available inside Effects" type="info">
+    `RegisterContainer` can be called both at the top level of a renderer and inside `Effect` callbacks.
+</Callout>
+
 **Example**:
 ```luau title="LeaderboardHandle.luau"
 local list = Handle.RegisterContainer(element.ScrollFrame) -- [!code highlight]
 
 for i, entry in ipairs(data.entries) do
-    local live = list.UpsertChild(entry.id, Assets.Row:Clone())
-    live.Label.Text  = entry.name
-    live.LayoutOrder = i
+    local row = Fragment.useComponent("LeaderboardRow", { name = entry.name, score = entry.score })
+    list.UpsertChild(entry.id, row)
 end
 ```
 
@@ -195,7 +198,7 @@ end
 
 ## `handle:derive(fn, deps)`
 
-Returns a getter whose value is recomputed only when `deps` changes. Use this to avoid recomputing expensive values on every render.
+Returns a getter whose value is recomputed only when `deps` changes.
 
 <TypeTable
   type={{
@@ -247,7 +250,7 @@ Handle.Connect("BuyBtn", buyButton.Activated, onBuy)
 
 ## `handle:await(fn, deps?)`
 
-Runs `fn` asynchronously and returns a status table. Triggers a re-render when the operation settles. Re-runs whenever `deps` changes.
+Runs `fn` asynchronously and returns a status table. Triggers a re-render when the operation settles.
 
 <Callout title="Non-blocking" type="info">
     `await` uses `task.spawn` internally and never yields the renderer. The renderer immediately receives a `"pending"` status table and re-renders again once the operation resolves.
@@ -291,7 +294,7 @@ end
 
 ## `handle:pull(ctx)`
 
-Subscribes the handle to a [Context](/API/Context) and returns the live value table. The handle re-renders whenever `ctx:patch()` is called.
+Subscribes the handle to a [Context](/API/Context) and returns the live value table.
 
 <TypeTable
   type={{
@@ -304,7 +307,7 @@ Subscribes the handle to a [Context](/API/Context) and returns the live value ta
 
 **Example**:
 ```luau title="ShopHandle.luau"
-local ctx = Handle:pull(WindowContext) -- [!code highlight]
+local win = Handle:pull(WindowContext) -- [!code highlight]
 
 element.Visible = win.active == "Shop"
 ```
