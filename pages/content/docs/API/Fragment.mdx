@@ -14,9 +14,13 @@ import { Callout } from 'fumadocs-ui/components/callout';
 **Fragment provides**:
 - Declarative UI Handles
 - Reusable Components
+- Instance creation from code (`create`)
+- Mounting onto ad-hoc Instances (`mount`)
 - Reactive local bindings
+- Spring-based motion
 - Derived state
 - Async state helpers
+- Replicated Attributes
 - Global stores
 - Context propagation
 - Automatic effect lifecycle management
@@ -48,9 +52,93 @@ WindowContext._value.toggle = function(name: string)
     end
 end
 ```
+
+---
+
+## `Fragment.Children`
+
+Sentinel key for `Fragment.create`'s `props` table. `[Fragment.Children] = { ... }` names the children to parent under the new Instance.
+
+<TypeTable
+  type={{
+    Children: {
+      description: "Sentinel key naming the children to parent under a Fragment.create'd Instance.",
+      type: "any"
+    }
+  }}
+/>
+
+**Example**:
+```luau
+local frame = Fragment.create("Frame", {
+    [Fragment.Children] = { -- [!code highlight]
+        Title = Fragment.create("TextLabel", { Text = "Hello" }), -- [!code highlight]
+    }, -- [!code highlight]
+})
+```
 ---
 
 # Methods
+
+## `create(className, props?)`
+
+Builds a Roblox Instance from code — no Studio template required. This is Fragment's answer to `Roact.createElement` / `Fusion.New`: it creates the Instance immediately, applies every property, connects any `[OnEvent(...)]` handlers, and parents `[Children]` under it.
+
+<TypeTable
+  type={{
+    create: {
+      description: "Creates and configures a new Instance.",
+      type: "(className: string, props: { [any]: any }?) -> Instance"
+    }
+  }}
+/>
+
+<Callout title="Eager, not virtual" type="info">
+    Unlike a virtual-DOM `createElement`, this returns a real, already-configured Instance immediately — not a description to be reconciled later. Lists are still reconciled by key via `Container.UpsertChild` / `Each`, not by diffing a tree.
+</Callout>
+
+`[Children]` is always a table of Instances: `{ label }` for an anonymous child, `{ Title = label }` to also rename it, or a mix of both.
+
+**Example**:
+```luau title="Components/ConfirmDialog.luau"
+local dialog = Fragment.create("Frame", { -- [!code highlight]
+    Size = UDim2.fromOffset(300, 150), -- [!code highlight]
+    [Fragment.Children] = { -- [!code highlight]
+        Confirm = Fragment.create("TextButton", { -- [!code highlight]
+            Text = "Confirm", -- [!code highlight]
+            [Fragment.OnEvent("Activated")] = function() -- [!code highlight]
+                print("confirmed") -- [!code highlight]
+            end, -- [!code highlight]
+        }), -- [!code highlight]
+    }, -- [!code highlight]
+}) -- [!code highlight]
+```
+
+---
+
+## `OnEvent(eventName)`
+
+Builds a sentinel key for `Fragment.create`'s `props` table: `[Fragment.OnEvent("Activated")] = fn` connects `fn` to `element.Activated` as part of construction.
+
+<TypeTable
+  type={{
+    OnEvent: {
+      description: "Builds a sentinel key that connects an event handler during Fragment.create.",
+      type: "(eventName: string) -> any"
+    }
+  }}
+/>
+
+**Example**:
+```luau
+Fragment.create("TextButton", {
+    [Fragment.OnEvent("Activated")] = function() -- [!code highlight]
+        print("clicked")
+    end,
+})
+```
+
+---
 
 ## `createStore(name, builder)`
 
@@ -169,6 +257,35 @@ Returns a registered Handle.
 **Example**:
 ```luau title="OtherRandomHandle.luau"
 local MoneyLabelHandle = Fragment.getHandle("MoneyLabel")
+```
+
+---
+
+## `mount(container, renderer)`
+
+Mounts `renderer` directly onto an already-existing Instance, bypassing the `PlayerGui` path resolution `newHandle` relies on. For anything that isn't a permanent screen reached by a fixed path: a [Flipbook](https://devforum.roblox.com/t/2184387)/[UI Labs](https://ui-labs.luau.page) preview, a tooltip, anything built and torn down on the fly.
+
+<TypeTable
+  type={{
+    mount: {
+      description: "Mounts a renderer onto an existing Instance. Renders once immediately.",
+      type: "(container: Instance, renderer: (element: Instance, data: { [string]: any }) -> ()) -> Handle"
+    }
+  }}
+/>
+
+<Callout title="Not in the registry" type="warn">
+    A mounted handle is never added to Fragment's global registry — `dispatchAll` and `getHandle` never see it, since it has no stable name and is expected to come and go. Call `:Unmount()` when you're done with it — see [Handle](/API/Handle#unmount) for exactly what that tears down.
+</Callout>
+
+**Example**:
+```luau title="MyButton.story.luau"
+local handle = Fragment.mount(container, function(element) -- [!code highlight]
+    element.BackgroundTransparency = 0
+end)
+
+-- later
+handle:Unmount() -- [!code highlight]
 ```
 
 ---

@@ -16,14 +16,28 @@
     <br/>
 </div>
 
-Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, globals stores, re-usable components which allow you to build reactive user interfaces whilst still using default Roblox's UI components.
+Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering and instance creation, spring-based animation, global stores, re-usable components, and Storybook-style previewing ([Flipbook](https://devforum.roblox.com/t/2184387)/[UI Labs](https://ui-labs.luau.page) compatible) which allow you to build reactive user interfaces whilst still using default Roblox's UI components.
 
 To learn more or get more details on the installation and available methods, [read the docs](https://chteau.github.io/Fragment/) here.
 
 ## Installation
 
+### Via Wally (recommended)
+
+Fragment is published on the [Wally](https://wally.run/) registry. Add it to your `wally.toml`:
+```toml
+[dependencies]
+Fragment = "chteau/fragment@0.1.0"
+```
+Then run `wally install`. Fragment installs under `ReplicatedStorage.Packages.Fragment` (or wherever your `Packages` folder is synced), so require it from there:
+```luau
+local Fragment = require(ReplicatedStorage.Packages.Fragment)
+```
+
+### Manually
+
 1. Insert a ModuleScript named `Fragment` into `ReplicatedStorage`.
-2. Paste the [source code](https://github.com/chteau/Fragment/blob/main/Fragment.luau) of Fragment into the ModuleScript you just created.
+2. Paste the [source code](https://github.com/chteau/Fragment/blob/main/src/Fragment/init.luau) of Fragment into the ModuleScript you just created.
 3. Created a folder for your UI (e.g., `MySuperDuperUI`) somwehere like in `StarterPlayerScripts`.
 
 And there you go, you got Fragment in your project! 🗣️
@@ -153,6 +167,62 @@ return Handle(function(element)
         -- ...
     end
 end)
+```
+
+### 6. Declarative Creation (`Fragment.create`)
+You don't need a hand-placed Studio template for everything — `Fragment.create` builds a real Instance from code, with properties, events, and children in one call.
+```luau
+local button = Fragment.create("TextButton", {
+  Text = "Click me",
+  [Fragment.OnEvent("Activated")] = function()
+    print("clicked")
+  end,
+  [Fragment.Children] = {
+    Title = Fragment.create("TextLabel", { Text = "Hello" }),
+  },
+})
+```
+
+### 7. Lists (`container.Each`)
+`RegisterContainer` already diffs children by key — `Each` wraps that loop so you don't write it by hand every time.
+```luau
+local list = Handle.RegisterContainer(element.ScrollFrame)
+
+list.Each(data.Entries, function(entry) return entry.Id end, function(entry)
+  return Fragment.create("TextLabel", { Name = entry.Id, Text = entry.Name })
+end)
+```
+
+### 8. Motion (`handle:spring`)
+Springs animate toward a target with real damped physics instead of jumping straight there — no manual Tween object to manage.
+```luau
+local size, setSize = Handle:spring(UDim2.fromOffset(100, 40), { frequency = 4, damping = 1 })
+
+Handle.Connect("Hover", element.MouseEnter, function()
+  setSize(UDim2.fromOffset(120, 48))
+end)
+
+element.Size = size()
+```
+
+### 9. Mounting Anywhere (`Fragment.mount`)
+`newHandle` resolves a fixed path under `PlayerGui`. `Fragment.mount` renders straight into any Instance you already have — a tooltip, a dynamically created ScreenGui, anything that isn't a permanent screen. Call `:Unmount()` when you're done; it tears down effects, connections, and store/context subscriptions for you.
+```luau
+local handle = Fragment.mount(someFrame, function(element)
+  element.BackgroundTransparency = 0
+end)
+
+-- later
+handle:Unmount()
+```
+
+This is also what makes Fragment components previewable in [Flipbook](https://devforum.roblox.com/t/2184387) and [UI Labs](https://ui-labs.luau.page) — see `Fragment.Integrations.Flipbook` / `Fragment.Integrations.UILabs`, and the [Storybook guide](https://chteau.github.io/Fragment/storybook) in the docs.
+
+### 10. Replicated Attributes (`handle:attribute`)
+A lighter alternative to wiring up a full store for values the engine already replicates for you — reads a Roblox [Attribute](https://create.roblox.com/docs/studio/properties#instance-attributes) and re-renders when it changes, regardless of whether the server sets it directly, via ReplicaService, Knit, or anything else.
+```luau
+local getCoins = Handle:attribute(player, "Coins")
+element.Text = `Coins: {getCoins()}`
 ```
 
 ## Possible Usages

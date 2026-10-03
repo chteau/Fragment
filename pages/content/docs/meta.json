@@ -12,6 +12,7 @@
         "create-new-context",
         "create-new-hook",
         "create-new-reactive-container",
+        "storybook",
 
         "---Public API---",
         "API/Fragment",

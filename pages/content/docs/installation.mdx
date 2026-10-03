@@ -6,6 +6,32 @@ icon: Package
 
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+<Tabs items={['Wally', 'Manual']}>
+<Tab value="Wally">
+
+### Add the dependency
+
+Fragment is published on the [Wally](https://wally.run/) registry. Add it to your `wally.toml`:
+
+```toml title="wally.toml"
+[dependencies]
+Fragment = "chteau/fragment@0.1.0"
+```
+
+Then run `wally install`. Fragment installs into wherever your `Packages` folder is synced (typically `ReplicatedStorage.Packages`), so it's required from there:
+
+```luau
+local Fragment = require(ReplicatedStorage.Packages.Fragment)
+```
+
+<Callout title="Storybook adapters included" type="info">
+    The [Flipbook](https://devforum.roblox.com/t/2184387) and [UI Labs](https://ui-labs.luau.page) adapters install as part of the package too — `ReplicatedStorage.Packages.Fragment.Integrations.Flipbook` / `.UILabs`. See the [Storybook guide](/storybook).
+</Callout>
+
+</Tab>
+<Tab value="Manual">
 
 <Steps>
 <Step>
@@ -19,9 +45,15 @@ In **ReplicatedStorage**, insert a new `ModuleScript` and name it `Fragment`.
 
 ### Paste the source
 
-Open the ModuleScript and paste the [Fragment source code](https://github.com/chteau/Fragment/blob/main/Fragment.luau) into it.
+Open the ModuleScript and paste the [Fragment source code](https://github.com/chteau/Fragment/blob/main/src/Fragment/init.luau) into it.
 
 </Step>
+</Steps>
+
+</Tab>
+</Tabs>
+
+<Steps>
 <Step>
 
 ### Create your project folder
