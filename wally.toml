@@ -1,0 +1,12 @@
+[package]
+name = "chteau/fragment"
+description = "A simple module to manage Roblox's UI instance system, inspired by React."
+version = "0.1.0"
+license = "MIT"
+authors = ["Cheeteau"]
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+exclude = ["pages", "tests", "img", "README.md", "LICENSE"]
+homepage = "https://chteau.github.io/Fragment/"
+
+[dependencies]

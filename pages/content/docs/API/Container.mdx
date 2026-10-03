@@ -171,3 +171,34 @@ Destroys every tracked child and resets the container to empty.
 ```luau
 list.ClearChildren() -- Wipe the list before a full rebuild
 ```
+
+---
+
+## `Each(items, keyFn, renderFn)`
+
+Renders a keyed list in one call: for each item, computes its key, builds its child Instance, and upserts it. This is exactly the `UpsertChild` loop every list-rendering Handle writes by hand — `Each` just removes the boilerplate. Items whose key isn't touched this pass are still removed at end-of-render, same as always.
+
+<TypeTable
+  type={{
+    Each: {
+      description: "Renders a keyed list via UpsertChild, in one call.",
+      type: "(items: { any }, keyFn: (item: any, index: number) -> string, renderFn: (item: any, index: number) -> Instance) -> ()"
+    }
+  }}
+/>
+
+**Example**:
+```luau title="LeaderboardHandle.luau"
+local list = Handle.RegisterContainer(element.ScrollFrame)
+
+list.Each(data.entries, function(entry) return entry.id end, function(entry, i) -- [!code highlight]
+    local row = Fragment.create("Frame", { -- [!code highlight]
+        [Fragment.Children] = { -- [!code highlight]
+            Label = Fragment.create("TextLabel", { Text = entry.name }), -- [!code highlight]
+            Score = Fragment.create("TextLabel", { Text = tostring(entry.score) }), -- [!code highlight]
+        }, -- [!code highlight]
+    }) -- [!code highlight]
+    row.LayoutOrder = i -- [!code highlight]
+    return row -- [!code highlight]
+end) -- [!code highlight]
+```

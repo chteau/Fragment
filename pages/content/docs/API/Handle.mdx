@@ -29,18 +29,22 @@ Handles manage:
 
 These methods are only active **inside a renderer or an Effect callback**. Calling them outside produces a warning and does nothing.
 
-## `Effect(fn)`
+## `Effect(fn, deps?)`
 
-Registers a side-effect that runs after every render. If `fn` returns a cleanup function, it is called before the next render.
+Registers a side-effect that runs after the render. If `fn` returns a cleanup function, it runs before the effect's next run.
 
 <TypeTable
   type={{
     Effect: {
-      description: "Registers a side-effect. The returned cleanup function runs before the next render.",
-      type: "(fn: () -> (() -> ())?) -> ()"
+      description: "Registers a side-effect. The returned cleanup function runs before the effect's next run.",
+      type: "(fn: () -> (() -> ())?, deps: { any }?) -> ()"
     }
   }}
 />
+
+<Callout title="deps works like derive's" type="info">
+    With no `deps`, the effect tears down and reruns on **every** render — the original behavior. Pass a `deps` array (same shallow-equal comparison as [`derive`](#handlederivefn-deps)) to skip teardown/rerun entirely when nothing in it changed, e.g. a connection that only needs re-wiring when the target Instance changes, not on every unrelated state update.
+</Callout>
 
 **Example**:
 ```luau title="ClockHandle.luau"
@@ -52,7 +56,11 @@ Handle.Effect(function()
     return function()
         conn:Disconnect() -- [!code highlight]
     end
-end)
+end) -- no deps: reconnects every render
+
+Handle.Effect(function() -- [!code highlight]
+    print("target changed:", targetId()) -- [!code highlight]
+end, { targetId() }) -- [!code highlight] -- skips teardown/rerun while targetId() is unchanged
 ```
 
 ---
@@ -194,6 +202,46 @@ for i, tab in ipairs(tabs) do
 end
 ```
 
+<Callout title="Batched" type="info">
+    Calling several setters in the same tick — two `bind` setters, a store update and a context patch, anything — produces exactly one render, not one per call. Fragment coalesces them the same way React 18's automatic batching does.
+</Callout>
+
+---
+
+## `handle:spring(initialValue, config?)`
+
+Creates a value that animates toward whatever target the setter is given, using damped spring physics instead of jumping straight there — the same idea as Fusion's `Spring`. The getter keeps changing on its own (via a shared `RunService.Heartbeat`) until it settles on the target.
+
+<TypeTable
+  type={{
+    spring: {
+      description: "Creates an animated value. Returns a getter and a setter for a new target.",
+      type: "(initialValue: any, config: { frequency: number?, damping: number? }?) -> (() -> any, (any) -> ())"
+    }
+  }}
+/>
+
+- `frequency` — oscillations per second if undamped (default `4`)
+- `damping` — `1` = critically damped, `< 1` = bouncy, `> 1` = sluggish (default `1`)
+
+<Callout title="Supported types" type="warn">
+    `number`, `Vector2`, `Vector3` and `UDim2` animate correctly (`UDim2` is decomposed into its four scalar components, since it has no scalar multiplication). Any other type — `Color3`, which Roblox gives no arithmetic operators at all — can't be integrated this way and just snaps straight to the target.
+</Callout>
+
+**Example**:
+```luau title="HoverCard.luau"
+local size, setSize = Handle:spring(UDim2.fromOffset(100, 40), { frequency = 4, damping = 1 }) -- [!code highlight]
+
+Handle.Connect("Hover", element.MouseEnter, function()
+    setSize(UDim2.fromOffset(120, 48)) -- [!code highlight]
+end)
+Handle.Connect("Unhover", element.MouseLeave, function()
+    setSize(UDim2.fromOffset(100, 40)) -- [!code highlight]
+end)
+
+element.Size = size()
+```
+
 ---
 
 ## `handle:derive(fn, deps)`
@@ -314,6 +362,32 @@ element.Visible = win.active == "Shop"
 
 ---
 
+## `handle:attribute(instance, attributeName)`
+
+Subscribes to a replicated Instance [Attribute](https://create.roblox.com/docs/studio/properties#instance-attributes) and returns a getter for its current value. Whatever sets it — a server script via `instance:SetAttribute`, ReplicaService, Knit, a plain RemoteEvent handler — shows up here reactively, through Roblox's own attribute replication, without Fragment depending on any particular networking library.
+
+<TypeTable
+  type={{
+    attribute: {
+      description: "Subscribes to a replicated Attribute. Returns a getter for its current value.",
+      type: "(instance: Instance, attributeName: string) -> () -> any"
+    }
+  }}
+/>
+
+<Callout title="Fixed on first call, like bind" type="info">
+    The `(instance, attributeName)` pair is fixed the first time this slot is called — calling it again with a different instance/name on a later render does not re-subscribe.
+</Callout>
+
+**Example**:
+```luau title="CoinsHandle.luau"
+local getCoins = Handle:attribute(player, "Coins") -- [!code highlight]
+
+element.Text = `Coins: {getCoins()}`
+```
+
+---
+
 # Other methods
 
 ## `Disconnect(connName)`
@@ -352,4 +426,31 @@ Manually triggers a full render pass.
 **Example**:
 ```luau
 Fragment.getHandle("HUD"):Render()
+```
+
+---
+
+## `Unmount()`
+
+Tears a handle down for good: runs every effect cleanup, disconnects every `Connect`/visibility/attribute connection, removes it from every store and context it subscribed to via `useStore`/`pull`, and cancels any spring still animating on it. Idempotent — safe to call more than once.
+
+<TypeTable
+  type={{
+    Unmount: {
+      description: "Tears down a handle: effects, connections, store/context subscriptions, springs.",
+      type: "() -> ()"
+    }
+  }}
+/>
+
+<Callout title="Mostly for Fragment.mount" type="info">
+    `newHandle`-created handles are meant to live for the whole session and never need this. It exists for handles that come and go on their own — [`Fragment.mount`](/API/Fragment#mountcontainer-renderer) is the main one.
+</Callout>
+
+**Example**:
+```luau
+local handle = Fragment.mount(container, renderer)
+
+-- later, when the preview/tooltip/whatever goes away
+handle:Unmount() -- [!code highlight]
 ```

@@ -1,2 +1,13 @@
 pages/.next/
+pages/out/
 pages/node_modules/
+tests/.bin/
+
+# Rojo / Wally
+/Packages/
+/ServerPackages/
+/*.rbxl
+/*.rbxlx
+/*.rbxl.lock
+/*.rbxlx.lock
+sourcemap.json

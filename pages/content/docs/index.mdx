@@ -6,7 +6,7 @@ icon: BookOpen
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering, global stores, reusable components and more, allowing you to build reactive user interfaces whilst still using default Roblox's UI components.
+Fragment is a simple module I made to manage Roblox's imperative UI instance system inspired by React. It currently supports state management, effects, declarative rendering and instance creation, spring-based animation, global stores, reusable components and more, allowing you to build reactive user interfaces whilst still using default Roblox's UI components. It's also previewable in [Flipbook](https://devforum.roblox.com/t/2184387) and [UI Labs](https://ui-labs.luau.page) — see the [Storybook guide](/storybook).
 
 Feel free to support my work by following my [Roblox profile](https://www.roblox.com/users/925308243/profile).
 
@@ -18,12 +18,17 @@ If you wanna test it out yourself, you can either [download a copy here](/Fragme
 
 - **Handles** — bind a renderer to a specific UI path
 - **Components** — reusable template-backed renderers with full reactive access
+- **Instance creation** — build Instances from code with `Fragment.create`, no Studio template required
+- **Mounting anywhere** — `Fragment.mount` renders into any Instance, not just a fixed PlayerGui path
 - **Reactive bindings** — local `bind`, `derive`, `hold`, `await`...
+- **Spring-based motion** — `handle:spring` animates toward a target with real damped physics
+- **Replicated Attributes** — `handle:attribute` reacts to a Roblox Instance Attribute changing
 - **Global stores** — centralized reactive state shared across Handles
 - **Contexts** — shared value objects
 - **Composable hooks** — reusable logic via `Fragment.compose`
-- **Diffing containers** — efficient dynamic child management
-- **Effect lifecycle** — automatic cleanup between renders
+- **Diffing containers** — efficient dynamic child management, plus a one-call `Each` for lists
+- **Effect lifecycle** — automatic cleanup between renders, with dependency-array skipping
+- **Storybook previews** — compatible with [Flipbook](https://devforum.roblox.com/t/2184387) and [UI Labs](https://ui-labs.luau.page)
 
 ---
 

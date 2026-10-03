@@ -1,0 +1,80 @@
+---
+title: Storybook Integrations
+description: Preview Fragment components in Flipbook or UI Labs.
+icon: Eye
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+[Flipbook](https://devforum.roblox.com/t/2184387) and [UI Labs](https://ui-labs.luau.page) are Roblox Studio plugins that preview UI components in an isolated environment, with live-editable controls — Roblox's answer to [Storybook](https://storybook.js.org/). Both expect to be handed a container Instance and a renderer; that's exactly what [`Fragment.mount`](/API/Fragment#mountcontainer-renderer) does, so wiring Fragment into either one is a thin adapter rather than a new integration layer.
+
+Fragment ships both adapters for you — installed via Wally, they sit under `Fragment.Integrations`.
+
+<Callout title="Neither plugin is required to use Fragment" type="info">
+    This page is only relevant if you already use (or want to try) Flipbook or UI Labs. Nothing else in Fragment depends on them.
+</Callout>
+
+---
+
+## How it fits together
+
+Both plugins hand your story function a container Instance and ask for an optional cleanup function back. `Fragment.mount` already does exactly that:
+
+```luau
+local handle = Fragment.mount(container, function(element)
+    -- build/update element
+end)
+
+-- cleanup, when the plugin tears the story down
+handle:Unmount()
+```
+
+The adapters below just translate each plugin's specific calling convention into that shape.
+
+---
+
+## Usage
+
+<Tabs items={['Flipbook', 'UI Labs']}>
+<Tab value="Flipbook">
+
+Flipbook's vanilla story shape is `{ controls, story }`. `Flipbook.wrap` fills in `story` with a `Fragment.mount`:
+
+```luau title="MyButton.story.luau"
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local FragmentModule = ReplicatedStorage.Packages.Fragment
+local Fragment = require(FragmentModule)
+local Flipbook = require(FragmentModule.Integrations.Flipbook)
+
+return Flipbook.wrap(Fragment, function(element, controls) -- [!code highlight]
+    element.Text = controls.text
+end, { text = "Hello" })
+```
+
+Flipbook controls only set the *initial* values for a story; later edits remount the whole story (calling your returned cleanup, then calling `story` again), which `Fragment.mount`/`Unmount` already handle correctly.
+
+</Tab>
+<Tab value="UI Labs">
+
+UI Labs' library-agnostic story shape uses a `render` key and calls it exactly once, pushing every later control edit through `props.subscribe` instead of re-calling `render`. `UILabs.wrap` keeps the latest values in a closure and calls `handle:Render()` directly on each edit — the same reactive trigger Fragment uses everywhere else, no throwaway store required:
+
+```luau title="MyButton.story.luau"
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local FragmentModule = ReplicatedStorage.Packages.Fragment
+local Fragment = require(FragmentModule)
+local UILabs = require(FragmentModule.Integrations.UILabs)
+
+return UILabs.wrap(Fragment, function(element, controls) -- [!code highlight]
+    element.Visible = controls.Visible
+end, { Visible = true })
+```
+
+</Tab>
+</Tabs>
+
+---
+
+## Writing the adapter yourself
+
+Both adapters are ~20 lines each — read [`Flipbook.luau`](https://github.com/chteau/Fragment/blob/main/src/Fragment/Integrations/Flipbook.luau) and [`UILabs.luau`](https://github.com/chteau/Fragment/blob/main/src/Fragment/Integrations/UILabs.luau) if you want to wrap a different tool, or need something the built-in adapters don't cover. The pattern is always the same: call `Fragment.mount` with the plugin's container, and call `handle:Unmount()` from whatever the plugin calls its cleanup/teardown hook.
